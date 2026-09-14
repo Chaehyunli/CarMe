@@ -1,0 +1,1 @@
+"""CarMe FastAPI application package."""

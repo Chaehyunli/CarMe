@@ -1,0 +1,25 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+backend/.venv/
+
+# Local service data
+db_data/
+minio_data/
+
+# Generated manual artifacts and private source files
+derived/
+*.pdf
+!CN7_2025_ko_KR.pdf

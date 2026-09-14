@@ -1,194 +1,164 @@
-# 현대차 매뉴얼 기반 RAG 상담 서비스 — 설계 정리
+# CarMe 차량별 매뉴얼 기반 상담 — 설계 요약
 
-## 1. 서비스 개요
+## 1. 이번 MVP의 확정 범위
 
-- **문제 상황**: 현대차 영업직원이 받는 고객 전화의 상당수가 "차량이 뭐가 안 된다"는 증상 위주 문의. 원인을 모른 채 증상만 듣고 해결책을 즉시 제공하기 어려움. 특히 고령 고객 등은 홈페이지의 세부 매뉴얼을 직접 찾아보지 않음.
-- **해결 방향**: 사용자가 자신의 차량을 등록하면, 해당 차종의 매뉴얼을 RAG로 검색해 증상에 맞는 해결책을 근거 문서(문서명 + 페이지 번호)와 함께 제시.
-- **실사용 주체**: 고객이 직접 쓰는 셀프서비스 앱.
-- **핵심 차별점**: 답변에 반드시 근거(문서 + 페이지)를 첨부 → hallucination 방지, 검증 가능한 답변. 근거가 없으면 "모른다 + 상담원 연결"로 폴백.
+### 제품 정의
 
-## 2. 스코프 결정 사항
+CarMe는 **등록한 차량의 공식 취급설명서에서 사용 방법·경고·점검 절차를 찾아, 원문 쪽수와 함께 안내하는 탐색 보조 서비스**다. 고장 원인 진단, 실제 장착 옵션 판정, 실시간 차량 데이터 진단, 정비 판정은 하지 않는다.
 
-| 결정 | 내용 |
+### 대상으로 확정한 데이터
+
+| 항목 | 값 |
 |---|---|
-| 메모리 범위 | 장기 메모리(세션 간 개인화) 없음. 세션 내 최근 메시지만 컨텍스트로 사용. 히스토리 화면은 별도의 기록용 저장(LLM 재입력용 아님) |
-| 대상 차종 | 2~3개 모델로 한정. 코드 구조는 확장 가능하게(`TARGET_MODELS` 리스트) 설계, 실행만 최소 범위 |
-| 외부 API | 현대차 공식/서드파티 API 모두 핵심 기능에 불필요. 차량 등록은 정적 드롭다운(차종/연식/트림) 선택 방식 |
-| (선택) 부가기능 | Smartcar 시뮬레이션 모드로 "실시간 차량 상태" 카드 추가 가능 — 핵심 스코프 아님, 여유 있을 때만 |
+| 지원 차량 | S3에 적재되어 `READY` 상태인 현대차 모델·연식 |
+| 초기 검증 파일 | `CN7_2025_ko_KR.pdf` (아반떼 CN7 2025) |
+| 초기 파일 특성 | 국문 취급설명서, 444 PDF 페이지, 약 18MB, 텍스트 추출 가능 |
+| 초기 파일 SHA-256 | `b197d45c76d9b1dbcc30cea739b9f33ed2e672cabc27f26ccfd5542aad518cff` |
+| 문서 종류 | 차종별 사용설명서 우선. 이후 내비게이션 등 적용 문서를 추가 가능 |
+| 지원 질문 | 사용 방법, 표시등/기능 설명, 매뉴얼에 명시된 점검·응급 절차 |
+| 제외 | 가격·구매 가능 여부, 옵션 장착 여부 확인, 리콜 여부, 정비 진단, 실시간 상태 |
 
-## 3. 문서 소스
+CN7 파일은 적재 파이프라인을 검증하기 위한 예시일 뿐, 제품의 지원 범위를 제한하지 않는다. 사용자는 **차량 모델과 연식(필요한 경우 모델 구분인 하이브리드·N Line 등)을 선택**하고, 서비스는 그 선택값에 적용되는 매뉴얼만 검색한다.
 
-### 3-1. 취급설명서(사용설명서) — RAG 대상 (증상 대응용)
-- 출처: `https://ownersmanual.hyundai.com/full_pdf/{모델코드}/{연식}/ko_KR`
-- 확인된 사례: `CE1/2025`, `NE1/2026`, `LX3HEV/2026`, `ME/2027` 등에서 실제 국문 PDF 확인됨
-- 아반떼 = `CN7`로 추정(중고차 매물 사이트 등에서 통용되는 표기) — **직접 URL 접속해서 검증 필요**
-- 과제: 상용 모델명 ↔ 내부 모델코드 매핑표를 대상 모델 2~3개에 대해 직접 구축해야 함
+차량별 세부 옵션은 등록받거나 판정하지 않는다. 매뉴얼이 트림·옵션을 함께 설명하더라도 서비스는 선택 차량의 적용 매뉴얼 전체를 검색해 기능 사용법을 답한다. 화면에는 “이 서비스는 세부 옵션 구성을 확인하지 않고 차량 선택에 연결된 통합 매뉴얼을 기준으로 안내합니다”를 고지한다. 이는 장착 여부 판정 기능이 없다는 제품 전제이며, 별도의 옵션 데이터 모델이나 조건부 답변 규칙을 만들지 않는다.
 
-### 3-2. 카탈로그/가격표 — 구조화 데이터 대상 (가격·옵션 정보용)
-- 출처: `https://www.hyundai.com/kr/ko/e/vehicles/catalog-price-download`
-- 모델별 다운로드 링크가 JS로 동적 로딩되어 단순 요청으로는 전체 목록 확보 불가 → 헤드리스 브라우저(Playwright 등) 필요할 수 있음. 3일 일정에서 시간이 걸릴 수 있는 지점
+### MVP 사용자 흐름
 
-### 3-3. 소스별 처리 방식 구분
-- "네비게이션이 안 켜져요" 같은 증상형 질문 → RAG(의미 검색)
-- "이 옵션 얼마예요?" 같은 정확한 사실 조회 → 구조화 테이블(`VEHICLE_OPTION`) 정확 매칭
-- "이 옵션이 뭐 하는 기능이에요?" 같은 설명형 질문 → RAG
+1. 카카오 로그인 후 지원 차량 목록에서 모델·연식·모델 구분을 선택해 차량을 등록한다.
+2. 증상 카테고리 또는 자연어로 질문한다.
+3. 위험 상황을 먼저 판정한다. 위험이면 RAG 답변을 만들지 않고 안전·공식 지원 안내를 표시한다.
+4. 일반 질문이면 선택 차량에 적용되는 `READY` 매뉴얼 청크만 검색한다.
+5. 근거가 충분하면 답변, 원문 인용, PDF 쪽수 링크를 저장·표시한다.
+6. 근거가 부족하면 추정하지 않고 상담 전환 안내를 저장·표시한다.
+7. 사용자는 차량별 과거 상담을 읽기 전용으로 조회한다.
 
-## 4. 데이터 처리 파이프라인
+## 2. 아키텍처 결정
 
-1. PDF 파일 자체를 정적 스토리지에 저장 (페이지 이미지 래스터화는 하지 않음). DB에는 `file_url`(경로)만 저장
-2. 페이지별 텍스트 추출 — PyMuPDF 등으로 페이지 번호 유지
-3. 청킹 — PDF 내장 목차(TOC/북마크, `doc.get_toc()`)가 있으면 섹션 단위로 우선 청킹, 없으면 폰트 헤딩 감지나 고정 길이로 폴백
-4. 임베딩 — BGE-M3
-5. 벡터 검색
-   - FAISS: 매뉴얼별 개별 인덱스. 한 차량에 연결된 여러 매뉴얼의 인덱스를 각각 검색 후 유사도 기준으로 결과를 머지
-   - Elasticsearch: `manual_id IN [...]` term filter로 다중 매뉴얼 검색을 한 번에 처리 (구현이 더 간단)
-6. 검색 범위 제한 — 사용자가 등록한 차량에 연결된 매뉴얼(`VEHICLE_MANUAL` 조인)로만 필터링. 차량 등록 시점에 (모델+연식+트림) 매칭 쿼리로 미리 계산해 `VEHICLE_MANUAL`에 저장 (실시간 매칭 로직 없이 즉시 조회)
-7. 답변 생성 — LangChain 단순 체인으로 MVP 우선. 시간이 남으면 LangGraph로 (a) 모호한 질문 되묻기 (b) 검색 결과 신뢰도 낮을 때 재검색 (c) 근거 없을 때 상담원 연결, 3개 분기만 확장
-8. Hallucination 방지 — 검색된 청크 범위 안에서만 답변하도록 프롬프트 제약. 근거 없으면 무조건 "모른다 + 상담원 연결" 폴백
+초기에는 `frontend + backend(FastAPI)` **2개 배포 단위**로 시작한다. AI를 별도 HTTP 마이크로서비스로 분리하지 않는다. 여러 매뉴얼을 적재하더라도 초기 규모에서는 인증 전달, 네트워크 장애, 배포·관측 비용만 늘고 분리의 실익이 작다.
 
-## 5. 시스템 아키텍처
+```text
+Browser
+  └─ Frontend
+       └─ FastAPI API
+            ├─ auth / vehicle / conversation API
+            ├─ rag module (retrieve, rerank, answer, citation validation)
+            ├─ PostgreSQL + pgvector
+            └─ S3-compatible object storage
 
-- **Spring Boot**: 회원/차량/대화 CRUD, 인증·인가 (동아리 관리 서비스에서 구현한 로그인·세션 관리 패턴 재사용, 이번엔 역할 계층 불필요)
-- **Python RAG 서비스**: 임베딩, 벡터 검색, LangChain/LangGraph — Spring Boot가 REST로 내부 호출
-- **인증**: JWT (서비스 간 인증 전달이 세션보다 간단)
-- **인가**: 모든 리소스 접근 시 요청자의 `user_id`와 리소스 소유 `user_id` 일치 검증 필수 — 다른 사용자의 차량·대화 정보 접근 차단
-
-## 6. ERD
-
-```mermaid
-erDiagram
-  USER ||--o{ VEHICLE : registers
-  VEHICLE ||--o{ VEHICLE_OPTION : has
-  VEHICLE ||--o{ VEHICLE_MANUAL : has
-  MANUAL ||--o{ VEHICLE_MANUAL : referenced_by
-  MANUAL ||--o{ MANUAL_PAGE : has
-  MANUAL_PAGE ||--o{ MANUAL_CHUNK : splits_into
-  USER ||--o{ CONVERSATION : starts
-  VEHICLE ||--o{ CONVERSATION : about
-  CONVERSATION ||--o{ MESSAGE : contains
-  MESSAGE ||--o{ CITATION : has
-  CITATION }o--|| MANUAL_CHUNK : references
-
-  USER {
-    uuid id PK
-    string name
-    string phone
-  }
-  VEHICLE {
-    uuid id PK
-    uuid user_id FK
-    string model
-    int model_year
-    string trim
-  }
-  VEHICLE_OPTION {
-    uuid id PK
-    uuid vehicle_id FK
-    string option_name
-    string description
-    int price
-  }
-  VEHICLE_MANUAL {
-    uuid id PK
-    uuid vehicle_id FK
-    uuid manual_id FK
-  }
-  MANUAL {
-    uuid id PK
-    string model
-    string model_year_range
-    string manual_type
-    string file_url
-  }
-  MANUAL_PAGE {
-    uuid id PK
-    uuid manual_id FK
-    int page_number
-    text raw_text
-  }
-  MANUAL_CHUNK {
-    uuid id PK
-    uuid manual_page_id FK
-    string section_title
-    text content
-  }
-  CONVERSATION {
-    uuid id PK
-    uuid user_id FK
-    uuid vehicle_id FK
-    datetime started_at
-  }
-  MESSAGE {
-    uuid id PK
-    uuid conversation_id FK
-    string role
-    text content
-  }
-  CITATION {
-    uuid id PK
-    uuid message_id FK
-    uuid manual_chunk_id FK
-    text snippet
-  }
+Manual ingestion command/worker
+  ├─ private object storage에서 PDF 읽기
+  ├─ 페이지 추출·청킹·임베딩
+  └─ PostgreSQL에 문서 메타데이터·텍스트·벡터 저장
 ```
 
-**설계 포인트**
-- `MANUAL_PAGE`와 `MANUAL_CHUNK`를 분리한 이유: 한 페이지에 청크가 여러 개 나올 수 있어 "검색 단위(청크)"와 "원본 참조 단위(페이지)"를 분리
-- `VEHICLE_MANUAL`을 다대다 조인 테이블로 둔 이유: 한 차량이 사용설명서·내비게이션 매뉴얼 등 여러 문서를 참조할 수 있음
-- `VEHICLE_OPTION.price`: 가격은 RAG가 아니라 이 필드에서 정확 매칭으로 조회
+- 개발 환경: Docker Compose의 PostgreSQL(`pgvector` 확장)과 MinIO(S3 호환)를 사용한다.
+- 운영 환경: PostgreSQL 관리형 DB와 AWS S3 등 S3 호환 스토리지로 교체한다. 애플리케이션은 S3 API만 사용한다.
+- 벡터 검색: MVP는 PostgreSQL + pgvector 하나로 통일한다. FAISS와 Elasticsearch는 도입하지 않는다.
+- AI 모듈: FastAPI 내부 `app/rag/` 패키지로 둔다. 문서 수·트래픽·GPU 작업량이 커졌을 때만 비동기 worker 또는 별도 AI 서비스로 분리한다.
+- 원본 PDF: 공개 정적 URL이 아니라 private bucket에 저장한다. 원문 보기는 API가 발급한 짧은 만료의 presigned URL로 제공한다.
 
-## 7. API 명세서
+## 3. S3 저장·문서 적재 설계
 
-| Method | Endpoint | 설명 |
-|---|---|---|
-| POST | `/auth/signup`, `/auth/login` | 회원가입/로그인 (JWT 발급) |
-| GET | `/vehicle-models` | 등록 가능한 차종 목록 |
-| GET | `/vehicle-models/{model}/trims?year=` | 연식별 트림·옵션 목록 |
-| POST | `/vehicles` | 내 차 등록 (model, model_year, trim) — 등록 시 `VEHICLE_MANUAL` 매핑 자동 계산 |
-| GET | `/vehicles`, `/vehicles/{id}` | 등록 차량 조회 (본인 소유만) |
-| POST | `/conversations` | 상담 세션 시작 (vehicle_id 포함) |
-| POST | `/conversations/{id}/messages` | 증상 질의 → 답변 + 근거 반환 |
-| GET | `/conversations/{id}` | 대화 히스토리 조회 |
+### Object key 규칙
 
-`POST /conversations/{id}/messages` 응답 예시:
-```json
-{
-  "answer": "...",
-  "citations": [
-    {
-      "manual_name": "아반떼 2024 사용설명서",
-      "manual_file_url": "/static/manuals/avante-2024.pdf",
-      "page": 87,
-      "snippet": "..."
-    }
-  ]
-}
+```text
+manuals/hyundai/{model-code}/{model-year}/{locale}/{manual-type}/{source-filename}.pdf
+derived/hyundai/{model-code}/{model-year}/{locale}/{manual-type}/{sha256}/pages.jsonl
+derived/hyundai/{model-code}/{model-year}/{locale}/{manual-type}/{sha256}/ingestion-manifest.json
 ```
-프론트에서는 `${manual_file_url}#page=${page}`로 열면 브라우저 내장 PDF 뷰어가 해당 페이지를 바로 보여줌 (별도 PDF 뷰어 라이브러리 불필요).
 
-## 8. 화면 플로우
+- 업로드 전 SHA-256을 계산하고, 이미 같은 해시가 있으면 재업로드·재색인하지 않는다.
+- `ingestion-manifest.json`에는 소스 URL, 수집 일시, 파일 해시, 추출기/청커/임베딩 모델 버전, 성공·실패 상태를 기록한다.
+- PDF 원본과 추출 산출물은 private bucket에 둔다. DB에는 object key와 메타데이터만 저장한다.
+- 원문 보기 API는 인용 쪽수 정보를 함께 반환한다. `#page={pdf_page}` fragment가 지원되지 않는 브라우저에서는 PDF를 열고 쪽수를 화면에 별도 표시한다.
 
-1. **온보딩/로그인** — 서비스 목적을 한 줄로 바로 전달
-2. **내 차 등록** — 차종 → 연식 → 트림을 드롭다운/카드로 선택 (텍스트 입력 없음)
-3. **홈 화면** — 등록 차량 카드 + 자주 묻는 증상 카테고리 큰 아이콘 버튼
-4. **증상 입력** — 카테고리 → 세부 증상 버튼, 해당 없으면 자유 텍스트
-5. **답변 + 근거 카드** — 요약 답변 + 매뉴얼명/페이지/스니펫, "원문 보기"로 해당 페이지 PDF 오픈
-6. **해결 안 됨 → 상담원 연결** — 근거 없거나 사용자가 "해결 안 됐어요" 선택 시 전화/예약 버튼으로 유도
-7. **히스토리** — 차량별 과거 상담 내역 조회
+### 적재 파이프라인
 
-## 9. 3일 작업 일정
+1. 원본 PDF를 object storage에 업로드하고 해시·크기·쪽수를 검증한다.
+2. PyMuPDF로 PDF 페이지별 텍스트를 추출한다. 이미지 전용 페이지 또는 빈 텍스트는 `extraction_status`에 남기고 필요 시 OCR 대상이 된다.
+3. PDF 내장 목차(있으면)와 본문 제목을 추출해 `manual_section`을 만든다. 내장 목차가 없으면 매뉴얼의 인쇄 목차·폰트 제목·페이지 번호로 섹션을 구성하고 검수한다.
+4. 각 섹션을 350~700 토큰 수준의 청크로 나눈다. 섹션이 페이지를 넘을 수 있으므로 청크는 여러 페이지를 참조할 수 있다.
+5. 각 청크에 `manual_id`, `section_id`, `pdf_page_start`, `pdf_page_end`, `content`, `embedding_model_version`을 부여하고 BGE-M3 등 확정한 다국어 임베딩 모델로 벡터를 생성해 pgvector에 저장한다.
+6. 표본 20개 이상에서 목차-섹션-본문 연결, 추출 텍스트, PDF 페이지·인쇄 쪽수 대응을 수동 검수한 뒤 `READY`로 전환한다.
 
-| Day | 작업 |
+`PDF 페이지`와 매뉴얼 본문의 `인쇄 쪽수`는 다를 수 있으므로 둘을 구분한다. 링크에는 PDF 페이지를 사용하고, 근거 카드에는 가능하면 `PDF 87쪽 / 본문 5-23쪽`처럼 함께 표시한다.
+
+## 4. 검색·답변·안전 규칙
+
+### 요청 분기
+
+| 분기 | 처리 |
 |---|---|
-| Day 1 | 기획서 확정, ERD·API 명세서 문서화, 화면 와이어프레임, 대상 모델 2~3개 확정 + 모델코드 매핑 검증, PDF 수집 시작 |
-| Day 2 | 텍스트 추출(TOC 기반 청킹) → 임베딩 → 벡터 검색 파이프라인 완성, 답변+인용 생성 체인 완성, Spring Boot API 기본 구현(인증 포함) |
-| Day 3 | 프론트엔드(등록·증상카테고리·답변카드) 구현, 통합 테스트, 데모 시나리오 리허설 |
+| 위험 신호 | RAG 생략, 안전 안내와 공식 지원 경로 표시 |
+| 지원 범위 밖 질문 | `INSUFFICIENT_EVIDENCE`, 추정 금지 |
+| 정보가 부족한 질문 | `AMBIGUOUS`, 차량 상태·표시등·발생 조건을 짧게 되묻기 |
+| 근거가 충분한 질문 | `GROUNDED`, 매뉴얼 기반 답변과 인용 표시 |
 
-## 10. 유의사항 및 검증 필요 항목
+위험 신호 사전 규칙은 최소한 제동 불능/조향 이상/연기·화재·연료 누출 의심/주행 중 심한 이상/사고 상황을 포함한다. 정확한 문구와 연결 번호는 서비스 오픈 전 안전 책임자 또는 공식 지원 정책에 맞춰 확정한다. 위험 신호에는 해결 절차를 추정해 생성하지 않는다.
 
-- **저작권**: 매뉴얼·카탈로그 PDF는 현대차 저작물. 포트폴리오/데모 목적이며 상업적 배포 아님을 명시
-- **크롤링 예의**: 요청 간 딜레이, 재다운로드 방지 캐싱
-- **검증 필요**
-  - `ownersmanual.hyundai.com/full_pdf/{코드}/{연식}/ko_KR` URL이 대상 모델에서 실제로 동작하는지
-  - 아반떼=CN7 등 모델코드 매핑의 정확성
-  - 카탈로그/가격표 페이지의 JS 렌더링 구조 (헤드리스 브라우저 필요 여부)
+### LangChain 기반 계층형 RAG와 GROUNDED 판정
+
+차량 선택이 매뉴얼을 고르는 일은 RAG가 아니라 DB의 결정적 매핑이다. RAG는 **선택된 매뉴얼 안에서** 어떤 목차 섹션과 페이지 청크가 질문의 근거인지 찾는다. 요청마다 S3의 PDF 전체를 다운로드하거나 LLM에 통째로 넣지 않는다. 적재 시 DB에 저장한 섹션·페이지·청크·벡터를 사용하고, S3는 원문 확인용 PDF를 제공한다.
+
+1. `ManualResolver`가 선택 차량의 `vehicle_catalog_variant`에 `manual_applicability`로 연결되고 상태가 `READY`인 manual ID 목록을 DB에서 구한다.
+2. `SectionRetriever`가 그 manual ID 안에서 질문과 가까운 목차 섹션을 1차로 고른다. 제목·목차 임베딩과 키워드를 함께 사용하며, 상위 3개 섹션 수는 설정값으로 관리한다.
+3. `ChunkRetriever`가 선택 섹션과 manual ID로 필터링한 pgvector 검색으로 실제 페이지 청크를 2차 검색·재정렬한다. 이 단계의 상위 청크와 점수 임계값도 설정값으로 관리한다.
+4. LangChain의 `Runnable` 체인(`분류 → 문서해결 → 섹션검색 → 청크검색 → 답변생성 → 인용검증`)이 최근 4개 메시지(총 2,000 토큰 이내)와 최종 청크만 LLM에 전달한다. 자율적으로 도구를 선택하는 Agent는 MVP에 사용하지 않는다.
+5. 답변의 조치·주의 문장마다 근거 청크가 있어야 하며, 인용 스니펫은 LLM 생성문이 아닌 원문에서 잘라 저장한다.
+6. 모델 출력, 인용 검증 또는 임계값 검사가 실패하면 답변을 버리고 `INSUFFICIENT_EVIDENCE`로 처리한다.
+
+매뉴얼의 `경고`, `주의`, `금지` 표시는 답변 요약 중 제거하지 않는다. 옵션·트림 관련 내용도 선택 차량에 연결된 통합 매뉴얼의 기능 안내로 처리하며, 서비스가 세부 장착 구성을 판정하지 않는다는 고지만 일관되게 표시한다.
+
+## 5. 데이터 모델
+
+필드 정의, 제약, 인덱스, 삭제 규칙의 기준 문서는 [ERD 및 데이터 사전](./erd_및_데이터사전.md)이다. 아래는 설계 개요다.
+
+```text
+USER 1 ─ N VEHICLE 1 ─ N CONVERSATION 1 ─ N MESSAGE 1 ─ N CITATION
+MANUAL 1 ─ N MANUAL_SECTION 1 ─ N MANUAL_CHUNK
+MANUAL 1 ─ N MANUAL_PAGE
+MANUAL_CHUNK N ─ N MANUAL_PAGE (CHUNK_PAGE)
+VEHICLE_CATALOG_VARIANT N ─ N MANUAL (MANUAL_APPLICABILITY)
+MESSAGE 1 ─ 1 RETRIEVAL_RUN
+```
+
+### 핵심 테이블과 제약
+
+| 테이블 | 필수 필드·규칙 |
+|---|---|
+| `user` | `id`, `kakao_subject`(UNIQUE), `created_at`, `last_login_at`; 전화번호는 수집하지 않음 |
+| `vehicle_catalog_variant` | `id`, `manufacturer`, `model_code`, `model_year`, `variant_code` nullable, `display_name`; 옵션이 아니라 매뉴얼을 구분하는 차량 선택 단위 |
+| `vehicle` | `id`, `user_id`, `catalog_variant_id`, `nickname`, `created_at`; 세부 옵션·트림 구성은 저장하지 않음. 동일 선택값 중복 정책은 UNIQUE 또는 허용 중 하나로 확정 |
+| `manual` | `id`, `title`, `type`, `locale`, `source_url`, `object_key`, `sha256`(UNIQUE), `pdf_page_count`, `status`, `indexed_at` |
+| `manual_applicability` | `manual_id`, `catalog_variant_id`; 사용자 차량이 아니라 카탈로그 기준으로 문서 적용 범위를 관리. 한 차량에 사용설명서·내비게이션 등 여러 문서를 연결 가능 |
+| `manual_section` | `id`, `manual_id`, `parent_section_id` nullable, `title`, `toc_order`, `pdf_page_start`, `pdf_page_end`, `retrieval_text`; 목차 기반 1차 검색 단위 |
+| `manual_page` | `manual_id`, `pdf_page_number`, `printed_page_number` nullable, `raw_text`, `extraction_status`; `(manual_id, pdf_page_number)` UNIQUE |
+| `manual_chunk` | `id`, `manual_id`, `section_id`, `content`, `pdf_page_start`, `pdf_page_end`, `embedding`, `embedding_model_version`; 페이지 근거를 찾는 2차 검색 단위 |
+| `chunk_page` | `chunk_id`, `manual_page_id`; 다중 페이지 청크의 쪽수 추적 |
+| `conversation` | `id`, `vehicle_id`, `status`, `started_at`; 사용자 소유권은 vehicle을 통해 검증 |
+| `message` | `id`, `conversation_id`, `role`, `content`, `result_status`, `created_at`; 사용자 질문과 시스템 응답 모두 저장 |
+| `citation` | `message_id`, `manual_chunk_id`, `manual_page_id`, `quote_text`, `pdf_page_number`; 원문 인용만 저장 |
+| `retrieval_run` | `question_message_id`(UNIQUE), `query`, `top_k`, `threshold_version`, `result_status`, `latency_ms`, `model_version` |
+
+초기에는 `VEHICLE_OPTION`과 가격 테이블을 만들지 않는다. 후속 단계에서 가격을 지원할 때는 개인 차량 옵션과 카탈로그 옵션을 분리한 `OPTION_CATALOG`, `TRIM_OPTION_AVAILABILITY`, `VEHICLE_INSTALLED_OPTION` 모델을 새로 설계한다.
+
+## 6. API 계약
+
+상세 endpoint, request/response, 오류 계약의 기준 문서는 [API 명세서](./api_명세서.md)다. 모든 보호 API는 access JWT를 요구하고, `conversation → vehicle → user` 경로로 소유권을 확인한다.
+
+핵심 public API는 카카오 로그인, 차량 카탈로그·등록, 차량별 상담, citation PDF URL 발급, 계정 삭제로 구성한다. 메시지 API는 `GROUNDED`, `AMBIGUOUS`, `INSUFFICIENT_EVIDENCE`, `SAFETY_ESCALATION` 상태를 문자열 답변과 분리해 반환한다. 근거 부족·모호·안전 전환 상태에는 근거 없는 해결책을 반환하지 않는다.
+
+## 7. 수용 기준과 검증
+
+구현 전에 **적재한 모델·연식별** 평가 세트를 만든다. 초기 CN7 2025 파일은 첫 세트로 사용하며, 새 매뉴얼을 `READY`로 전환하기 전 같은 형식의 평가 세트를 통과해야 한다. 각 세트는 매뉴얼 근거 질문 30개, 범위 밖 질문 10개, 위험 전환 질문 10개, 통합 매뉴얼 기능 질문 10개로 구성한다.
+
+- 근거 질문: 정답과 정확한 PDF 페이지 인용이 90% 이상
+- 범위 밖 질문: 추정 답변 미생성이 95% 이상
+- 위험 질문: 안전 전환 누락 0건
+- 인용 스니펫: 실제 저장 원문과 일치 100%
+- 대표 질의: P95 응답 시간 8초 이하
+- 접근 제어: 타 사용자 vehicle/conversation/citation 요청은 모두 403
+
+## 8. 후속 확장 조건
+
+새 차종·연식을 추가할 때마다 `vehicle_catalog_variant`, `manual_applicability`, 적재 manifest, 평가 세트를 함께 추가한다. AI 서비스를 분리하는 기준은 최소한 비동기 적재 작업이 API 워커를 지속적으로 점유하거나, 별도 GPU 추론·독립 확장·서로 다른 배포 주기가 실제로 필요한 시점이다.
