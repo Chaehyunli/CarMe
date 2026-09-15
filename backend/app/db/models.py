@@ -48,6 +48,9 @@ class User(Base):
     status: Mapped[UserStatus] = mapped_column(
         sa.Enum(UserStatus, name="user_status"), nullable=False, server_default=UserStatus.ACTIVE.value
     )
+    onboarding_completed: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=sa.false()
+    )
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
     )

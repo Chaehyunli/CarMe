@@ -22,7 +22,7 @@ npm install
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
-브라우저는 Ollama·MinIO를 직접 호출하지 않는다. 모든 인증, 매뉴얼 다운로드 URL, RAG 요청은 FastAPI를 통한다.
+브라우저는 Ollama에 직접 접근하지 않는다. 인증과 운영 API는 FastAPI를 통한다. 관리자 PDF 업로드만 FastAPI가 발급한 5분짜리 private-storage PUT URL로 직접 전송하며, object key·bucket·장기 자격증명은 화면과 API 응답에 노출하지 않는다.
 
 ## 2. 개발 서버 실행
 

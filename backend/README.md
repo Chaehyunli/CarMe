@@ -60,6 +60,20 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
+## 카카오 로그인·관리자 등록 설정
+
+`backend/.env`에 카카오 개발자 콘솔의 REST API 키와 backend callback URL을 설정한다. 콘솔 Redirect URI는 `KAKAO_REDIRECT_URI`와 정확히 일치해야 한다.
+
+```dotenv
+KAKAO_REST_API_KEY=...
+KAKAO_CLIENT_SECRET=... # 카카오 콘솔에서 클라이언트 시크릿을 사용 설정한 경우
+KAKAO_REDIRECT_URI=http://localhost:8000/api/v1/auth/kakao/callback
+FRONTEND_LOGIN_CALLBACK_URL=http://localhost:5173/auth/callback
+ADMIN_SIGNUP_CODE=change-this-local-code
+```
+
+첫 카카오 로그인 뒤 역할 선택 화면이 나타난다. `ADMIN`은 `ADMIN_SIGNUP_CODE`가 일치할 때만 선택할 수 있으며, 실제 값은 저장소에 커밋하지 않는다. 관리자 PDF 업로드는 private MinIO bucket에 짧은 만료의 presigned PUT URL로 전송한 뒤 서버가 SHA-256·파일 크기·PDF 페이지 수를 다시 검증한다.
+
 ## 4. Ollama 모델 준비
 
 모델 파일은 처음 한 번만 받는다. RAG 구현 전에는 내려받지 않아도 API health check는 동작한다.

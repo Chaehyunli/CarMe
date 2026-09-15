@@ -19,11 +19,14 @@ class Settings(BaseSettings):
     s3_secret_key: str
 
     kakao_rest_api_key: str = ""
+    kakao_client_secret: str = ""
     kakao_redirect_uri: str = ""
     frontend_login_callback_url: str = "http://localhost:5173/auth/callback"
+    admin_signup_code: str = ""
     jwt_secret: str
     jwt_access_ttl_minutes: int = 30
     jwt_refresh_ttl_days: int = 14
+    upload_url_ttl_seconds: int = 300
 
     openai_api_key: str = ""
     openai_chat_model: str = ""

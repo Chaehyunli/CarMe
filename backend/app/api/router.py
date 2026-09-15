@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app.api.admin import router as admin_router
+from app.api.auth import router as auth_router
 from app.api.vehicle_catalog import router as vehicle_catalog_router
 
 router = APIRouter()
@@ -11,3 +13,5 @@ def health() -> dict[str, str]:
 
 
 router.include_router(vehicle_catalog_router)
+router.include_router(auth_router)
+router.include_router(admin_router)
