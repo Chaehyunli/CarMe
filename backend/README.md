@@ -20,7 +20,7 @@ docker compose ps
 
 | 서비스 | 주소 |
 |---|---|
-| PostgreSQL | `localhost:5432` |
+| PostgreSQL | `localhost:55432` |
 | MinIO S3 API | `http://localhost:9000` |
 | MinIO Console | `http://localhost:9001` |
 | Ollama | `http://localhost:11434` |
@@ -39,6 +39,16 @@ python -m pip install -e '.[dev]'
 `backend/.env`는 로컬 실행용이므로 `DATABASE_URL`의 host는 `localhost`, `S3_ENDPOINT_URL`과 `OLLAMA_BASE_URL`도 `localhost`를 유지한다. 비밀 값은 Git에 올리지 않는다.
 
 ## 3. 로컬 API 실행
+
+DB schema를 최초 한 번 적용합니다.
+
+```bash
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+```
+
+그 다음 API를 실행합니다.
 
 ```bash
 cd backend

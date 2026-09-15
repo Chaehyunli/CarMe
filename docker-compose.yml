@@ -7,7 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-carme}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-carme_local_password}
     ports:
-      - "5432:5432"
+      # Keep the host's default PostgreSQL port free for local installations.
+      - "55432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:

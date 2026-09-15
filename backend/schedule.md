@@ -8,20 +8,20 @@
 - [x] Ollama Docker service와 영속 모델 volume 추가
 - [x] Swagger UI(`/docs`), ReDoc(`/redoc`), OpenAPI JSON과 Bearer 스키마 설정
 - [ ] `docker compose up --build`로 API·DB·MinIO·frontend 동시 기동 확인
-- [ ] `pytest`, `ruff check .` 실행 기준 확정
+- [x] `pytest`, `ruff check .` 실행 기준 확정
 
 ## 1. DB와 인증
 
-- [ ] Alembic 및 `vector` extension migration 작성
-- [ ] `user`, `refresh_token`, `vehicle_catalog`, `vehicle` 모델·제약 작성
-- [ ] `manual`, `manual_applicability`, `manual_section`, `manual_chunk` 모델 작성
-- [ ] `manual_chunk`에 `pdf_page_number`, `printed_page_number`을 직접 저장
+- [x] Alembic 및 `vector` extension migration 작성
+- [x] `user`, `refresh_token`, `vehicle_catalog`, `vehicle` 모델·제약 작성
+- [x] `manual`, `manual_applicability`, `manual_section`, `manual_chunk` 모델 작성
+- [x] `manual_chunk`에 `pdf_page_number`, `printed_page_number`을 직접 저장
 - [ ] `USER`/`ADMIN` role dependency와 카카오 OAuth, JWT, refresh token 구현
 - [ ] 일반 사용자의 `/admin/*` 403, 타 사용자 리소스 403 테스트 작성
 
 ## 2. 차량·단기 채팅 API
 
-- [ ] `GET /vehicle-catalog`: `ACTIVE` + 기본 `READY` 매뉴얼 차량만 반환
+- [x] `GET /vehicle-catalog`: `ACTIVE` + 기본 `READY` 매뉴얼 차량만 반환
 - [ ] 차량 등록·목록·별칭 수정·soft delete API 구현
 - [ ] `SessionStore`와 LangChain `InMemoryChatMessageHistory` 구현: 최근 4개 메시지/2,000 토큰, idle TTL 30분
 - [ ] `POST/GET/DELETE /chat-sessions` 및 세션 소유권·만료(`410`) 처리 구현
