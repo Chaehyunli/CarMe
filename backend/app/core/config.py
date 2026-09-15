@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     embedding_model_name: str = "qwen3-embedding:4b"
     embedding_dimensions: int = 1024
     chat_session_idle_ttl_minutes: int = 30
+    rag_minimum_evidence_score: float = 9.0
+    rag_minimum_topic_coverage: float = 0.5
+    rag_minimum_score_gap: float = 0.75
+    rag_minimum_diagnostic_signals: int = 1
+    rag_max_context_chunks: int = 4
+    rag_intent_llm_enabled: bool = True
+    rag_intent_model: str = ""
+    rag_intent_timeout_seconds: float = 4.0
+    rag_intent_history_turns: int = 4
+    tavily_api_key: str = ""
+    tavily_base_url: str = "https://api.tavily.com"
+    official_source_sync_timeout_seconds: float = 30.0
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

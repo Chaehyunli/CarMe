@@ -221,3 +221,30 @@ class ManualChunk(Base):
     content: Mapped[str] = mapped_column(sa.Text, nullable=False)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1024))
     embedding_model_version: Mapped[str | None] = mapped_column(sa.String(255))
+
+
+class OfficialSource(Base):
+    """A cached, allow-listed Hyundai web manual page for one vehicle catalog."""
+
+    __tablename__ = "official_sources"
+    __table_args__ = (
+        sa.UniqueConstraint("catalog_id", "source_url", name="uq_official_source_catalog_url"),
+        sa.Index("ix_official_source_catalog_type", "catalog_id", "source_type", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    catalog_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), sa.ForeignKey("vehicle_catalogs.id"), nullable=False
+    )
+    source_type: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    system_variant: Mapped[str | None] = mapped_column(sa.String(100))
+    title: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    source_url: Mapped[str] = mapped_column(sa.String(2048), nullable=False)
+    content: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(sa.String(64), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(30), nullable=False, server_default="READY")
+    discovered_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")
+    )
+    synced_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    ingestion_error: Mapped[str | None] = mapped_column(sa.Text)

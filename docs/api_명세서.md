@@ -35,7 +35,7 @@
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | 형식·값 검증 실패 |
 | 401 | `UNAUTHENTICATED` | JWT가 없거나 유효하지 않음 |
-| 403 | `FORBIDDEN` | 소유자가 아닌 리소스 접근 |
+| 403 | `FORBIDDEN` | 다른 사용자의 선택 차량·채팅 세션 리소스 접근 |
 | 404 | `NOT_FOUND` | 공개적으로 확인해도 되는 리소스 없음 |
 | 409 | `DUPLICATE_VEHICLE`, `CATALOG_NOT_PUBLISHABLE`, `MANUAL_STATE_CONFLICT` | 중복·상태 전이 조건 불충족 |
 | 410 | `CHAT_SESSION_EXPIRED` | 메모리 세션이 종료·만료·재시작으로 사라짐 |
@@ -87,7 +87,7 @@ logout은 refresh token을 폐기·cookie 삭제하고 `204`를 반환한다. `G
 
 ### `GET /vehicles` / `GET /vehicles/{vehicleId}` / `PATCH /vehicles/{vehicleId}` / `DELETE /vehicles/{vehicleId}`
 
-소유자만 조회·수정·삭제한다. PATCH는 별칭만 바꾼다. DELETE는 `vehicle.deleted_at`을 설정하고 `204`를 반환한다. 이 차량을 참조하는 살아 있는 메모리 세션은 즉시 제거한다.
+선택 차량을 등록한 사용자만 조회·수정·삭제한다. 이는 실제 차량 소유권 확인이 아니라 계정별 선택 목록 접근 제어다. PATCH는 별칭만 바꾼다. DELETE는 `vehicle.deleted_at`을 설정하고 `204`를 반환한다. 이 차량을 참조하는 살아 있는 메모리 세션은 즉시 제거한다.
 
 ## 4. 단기 채팅 세션 API
 
@@ -114,7 +114,7 @@ logout은 refresh token을 폐기·cookie 삭제하고 `204`를 반환한다. `G
 }
 ```
 
-차량 소유권, `ACTIVE` 카탈로그, 현재 기본 `READY` 매뉴얼을 검증한다. 이 조건이 아니면 세션을 만들지 않는다.
+선택 차량 항목의 사용자별 접근 권한, `ACTIVE` 카탈로그, 현재 기본 `READY` 매뉴얼을 검증한다. 실제 차량 소유권은 확인하지 않는다. 이 조건이 아니면 세션을 만들지 않는다.
 
 ### `GET /chat-sessions/{sessionId}/manuals`
 
@@ -122,7 +122,7 @@ logout은 refresh token을 폐기·cookie 삭제하고 `204`를 반환한다. `G
 
 ### `POST /chat-sessions/{sessionId}/manuals/{manualId}/download-url`
 
-**인증 필요.** 세션 소유자만 호출한다. 해당 차량에 현재 적용되고 `READY`인 매뉴얼일 때만 5분 만료 private PDF URL을 발급한다.
+**인증 필요.** 세션을 만든 사용자만 호출한다. 해당 차량에 현재 적용되고 `READY`인 매뉴얼일 때만 5분 만료 private PDF URL을 발급한다.
 
 ```json
 {"url": "https://signed.example/...", "filename": "avante_2025_ko.pdf", "expires_at": "2026-09-15T00:05:00Z"}

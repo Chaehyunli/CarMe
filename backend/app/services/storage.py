@@ -68,6 +68,20 @@ class PrivateStorage:
             raise ValueError("페이지가 없는 PDF 파일은 업로드할 수 없습니다.")
         return page_count
 
+    def read_bytes(self, object_key: str) -> bytes:
+        """Read a private object for server-side ingestion only."""
+        body = self.client.get_object(Bucket=self.settings.s3_bucket, Key=object_key)["Body"]
+        return b"".join(_read_chunks(body))
+
+    def create_download_url(self, object_key: str) -> str:
+        """Create a short-lived URL without exposing storage details in API data."""
+        return self.client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self.settings.s3_bucket, "Key": object_key},
+            ExpiresIn=self.settings.upload_url_ttl_seconds,
+            HttpMethod="GET",
+        )
+
 
 def _read_chunks(body: object) -> Iterator[bytes]:
     while True:

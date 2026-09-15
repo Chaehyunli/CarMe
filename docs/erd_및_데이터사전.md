@@ -159,7 +159,7 @@ erDiagram
 | 속성 | 타입 | 필수 | 설명 |
 |---|---|---:|---|
 | `id` | UUID | 예 | PK |
-| `user_id` | UUID | 예 | 소유자 `user.id` FK |
+| `user_id` | UUID | 예 | 선택 차량을 등록한 계정 `user.id` FK |
 | `catalog_id` | UUID | 예 | 선택한 `vehicle_catalog.id` FK |
 | `nickname` | varchar | 예 | 예: `우리 차` |
 | `created_at`, `deleted_at` | timestamptz | 예/아니오 | 생성·soft delete 시각 |
@@ -226,7 +226,7 @@ LangChain `InMemoryChatMessageHistory`와 서버 `SessionStore`가 프로세스 
 | 값 | 용도 | 보존 |
 |---|---|---|
 | `session_id` | 예측 불가능한 UUID, API 경로 식별 | 브라우저 이탈·명시적 종료·idle TTL·프로세스 재시작까지 |
-| `user_id`, `vehicle_id` | 세션 소유권·선택 차량 검증 | 같은 기간 |
+| `user_id`, `vehicle_id` | 세션 접근 권한·선택 차량 검증 | 같은 기간 |
 | `history` | 최근 최대 4개 메시지/2,000 토큰 | 같은 기간; DB 미저장 |
 | `created_at`, `last_accessed_at`, `expires_at` | TTL 관리 | 같은 기간 |
 
@@ -237,7 +237,7 @@ LangChain `InMemoryChatMessageHistory`와 서버 `SessionStore`가 프로세스 
 | 테이블 | 책임 |
 |---|---|
 | `user`, `refresh_token` | 카카오 계정·로그인 갱신 |
-| `vehicle_catalog`, `vehicle` | 모델+연식 선택과 사용자 차량 소유권 |
+| `vehicle_catalog`, `vehicle` | 모델+연식 선택과 사용자별 선택 차량 항목 |
 | `manual`, `manual_applicability` | PDF 버전·상태와 차량별 적용 범위 |
 | `manual_section`, `manual_chunk` | 목차→페이지 RAG 검색과 실시간 근거 |
 

@@ -23,7 +23,7 @@
 
 `POST /chat-sessions`는 질문 없이 세션을 만든다.
 
-1. 로그인 사용자와 `vehicle_id` 소유권을 확인한다.
+1. 로그인 사용자가 자신이 선택해 둔 `vehicle_id`에 접근하는지 확인한다. 실제 차량 소유 여부·VIN은 확인하지 않는다.
 2. `vehicle.catalog_id`가 `ACTIVE`이고 적용 기본 매뉴얼이 `READY`인지 확인한다.
 3. 예측 불가능한 `session_id`와 `InMemoryChatMessageHistory`를 서버 RAM `SessionStore`에 넣는다.
 4. 현재 문서 제목·종류·PDF 쪽수·다운로드 가능 여부를 반환한다.

@@ -12,6 +12,7 @@ export const router = createRouter({
     { path: "/login", component: LoginView },
     { path: "/auth/callback", component: AuthCallbackView },
     { path: "/admin", component: AdminView },
-    { path: "/welcome", component: UserWelcomeView },
+    { path: "/welcome", redirect: "/app" },
+    { path: "/app", component: UserWelcomeView },
   ],
 });

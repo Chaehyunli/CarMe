@@ -25,10 +25,19 @@ from app.schemas.admin import (
     AdminVehicleCatalogResponse,
     AdminVehicleCatalogUpdate,
     ManualCreateRequest,
+    ManualIndexResponse,
     ManualResponse,
     ManualUpdateRequest,
+    OfficialSourceResponse,
+    OfficialSourceSyncResponse,
     UploadCompleteResponse,
     UploadUrlResponse,
+)
+from app.services.manual_ingestion import index_manual_for_local_test
+from app.services.official_source_sync import (
+    OfficialSourceSyncError,
+    resolve_official_sources,
+    sync_official_sources,
 )
 from app.services.storage import PrivateStorage
 
@@ -129,6 +138,44 @@ def update_admin_catalog(
     return catalog_response(catalog)
 
 
+@router.get(
+    "/vehicle-catalog/{catalog_id}/official-sources",
+    response_model=list[OfficialSourceResponse],
+)
+def list_official_sources(
+    catalog_id: UUID,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> list[OfficialSourceResponse]:
+    catalog = db.get(VehicleCatalog, catalog_id)
+    if catalog is None or catalog.status == CatalogStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="차량을 찾을 수 없습니다.")
+    return [official_source_response(source) for source in resolve_official_sources(db, catalog_id)]
+
+
+@router.post(
+    "/vehicle-catalog/{catalog_id}/official-sources/sync",
+    response_model=OfficialSourceSyncResponse,
+)
+async def sync_catalog_official_sources(
+    catalog_id: UUID,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> OfficialSourceSyncResponse:
+    catalog = db.get(VehicleCatalog, catalog_id)
+    if catalog is None or catalog.status == CatalogStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="차량을 찾을 수 없습니다.")
+    try:
+        sources = await sync_official_sources(db, catalog)
+    except OfficialSourceSyncError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return OfficialSourceSyncResponse(
+        catalog_id=catalog.id,
+        synced_count=len(sources),
+        sources=[official_source_response(source) for source in sources],
+    )
+
+
 @router.delete("/vehicle-catalog/{catalog_id}", status_code=status.HTTP_204_NO_CONTENT)
 def archive_admin_catalog(
     catalog_id: UUID,
@@ -156,7 +203,7 @@ def create_manual(
     catalog_ids = list(dict.fromkeys(payload.catalog_ids))
     primary_ids = set(payload.primary_catalog_ids)
     if not primary_ids.issubset(set(catalog_ids)):
-        raise HTTPException(status_code=422, detail="기본 매뉴얼 대상은 적용 차량 안에서 선택해야 합니다.")
+        raise HTTPException(status_code=422, detail="대표 매뉴얼 대상은 적용 차량 안에서 선택해야 합니다.")
     catalogs = list(db.scalars(select(VehicleCatalog).where(VehicleCatalog.id.in_(catalog_ids))))
     if len(catalogs) != len(catalog_ids):
         raise HTTPException(status_code=404, detail="적용 차량을 찾을 수 없습니다.")
@@ -192,7 +239,7 @@ def create_manual(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "MANUAL_CONFLICT", "message": "이미 연결된 기본 매뉴얼 또는 동일 파일입니다."},
+            detail={"code": "MANUAL_CONFLICT", "message": "이미 연결된 대표 매뉴얼 또는 동일 파일입니다."},
         ) from exc
     db.refresh(manual)
     return manual_response(manual, catalogs, primary_ids)
@@ -249,7 +296,7 @@ def update_manual(
     catalog_ids = list(dict.fromkeys(payload.catalog_ids))
     primary_ids = set(payload.primary_catalog_ids)
     if not primary_ids.issubset(set(catalog_ids)):
-        raise HTTPException(status_code=422, detail="기본 매뉴얼 대상은 적용 차량 안에서 선택해야 합니다.")
+        raise HTTPException(status_code=422, detail="대표 매뉴얼 대상은 적용 차량 안에서 선택해야 합니다.")
     catalogs = list(db.scalars(select(VehicleCatalog).where(VehicleCatalog.id.in_(catalog_ids))))
     if len(catalogs) != len(catalog_ids) or any(catalog.status == CatalogStatus.ARCHIVED for catalog in catalogs):
         raise HTTPException(status_code=404, detail="적용 차량을 찾을 수 없습니다.")
@@ -272,7 +319,7 @@ def update_manual(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "MANUAL_CONFLICT", "message": "이미 연결된 기본 매뉴얼이 있습니다."},
+            detail={"code": "MANUAL_CONFLICT", "message": "이미 연결된 대표 매뉴얼이 있습니다."},
         ) from exc
     db.refresh(manual)
     return manual_response(manual, catalogs, primary_ids)
@@ -287,6 +334,10 @@ def archive_manual(
     manual = db.get(Manual, manual_id)
     if manual is None or manual.status == ManualStatus.ARCHIVED:
         raise HTTPException(status_code=404, detail="매뉴얼을 찾을 수 없습니다.")
+    # 보관된 문서는 더 이상 차량 공개 조건을 충족하거나 대표 매뉴얼 자리를 점유하지 않는다.
+    db.query(ManualApplicability).filter(ManualApplicability.manual_id == manual.id).update(
+        {ManualApplicability.is_primary: False}, synchronize_session=False
+    )
     manual.status = ManualStatus.ARCHIVED
     db.commit()
 
@@ -352,6 +403,25 @@ def complete_manual_upload(
     return UploadCompleteResponse(id=manual.id, status=manual.status, pdf_page_count=page_count)
 
 
+@router.post("/manuals/{manual_id}/prepare-rag-test", response_model=ManualIndexResponse)
+def prepare_manual_rag_test(
+    manual_id: UUID,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ManualIndexResponse:
+    """Extract and chunk an uploaded PDF, then expose it to the local user RAG test."""
+    manual = db.get(Manual, manual_id)
+    if manual is None or manual.status == ManualStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="매뉴얼을 찾을 수 없습니다.")
+    try:
+        page_count = index_manual_for_local_test(db, manual)
+    except (ClientError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="문서 테스트 준비 중 오류가 발생했습니다.") from exc
+    return ManualIndexResponse(id=manual_id, status=ManualStatus.READY, indexed_page_count=page_count)
+
+
 def manual_response(
     manual: Manual, catalogs: list[VehicleCatalog], primary_catalog_ids: set[UUID] | list[UUID]
 ) -> ManualResponse:
@@ -369,4 +439,16 @@ def manual_response(
         applicable_catalogs=[catalog.display_name for catalog in catalogs],
         uploaded_at=manual.uploaded_at,
         ingestion_error=manual.ingestion_error,
+    )
+
+
+def official_source_response(source) -> OfficialSourceResponse:
+    return OfficialSourceResponse(
+        id=source.id,
+        source_type=source.source_type,
+        system_variant=source.system_variant,
+        title=source.title,
+        source_url=source.source_url,
+        status=source.status,
+        synced_at=source.synced_at,
     )

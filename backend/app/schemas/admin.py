@@ -76,3 +76,25 @@ class UploadCompleteResponse(BaseModel):
     id: UUID
     status: ManualStatus
     pdf_page_count: int
+
+
+class ManualIndexResponse(BaseModel):
+    id: UUID
+    status: ManualStatus
+    indexed_page_count: int
+
+
+class OfficialSourceResponse(BaseModel):
+    id: UUID
+    source_type: str
+    system_variant: str | None = None
+    title: str
+    source_url: str
+    status: str
+    synced_at: datetime
+
+
+class OfficialSourceSyncResponse(BaseModel):
+    catalog_id: UUID
+    synced_count: int
+    sources: list[OfficialSourceResponse]

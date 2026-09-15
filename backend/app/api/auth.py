@@ -112,6 +112,7 @@ async def kakao_callback(
     nickname = (
         profile.get("properties", {}).get("nickname")
         or profile.get("kakao_account", {}).get("profile", {}).get("nickname")
+        or profile.get("kakao_account", {}).get("name")
         or "CarMe 사용자"
     )
     user = db.scalar(select(User).where(User.kakao_subject == kakao_subject))
@@ -125,6 +126,9 @@ async def kakao_callback(
         )
         db.add(user)
         db.flush()
+    elif user.display_name == "CarMe 사용자" and nickname != "CarMe 사용자":
+        # 카카오 동의 항목이 나중에 추가된 경우, 기존 fallback 이름을 실제 프로필 이름으로 보완한다.
+        user.display_name = nickname[:100]
 
     refresh_value = new_refresh_token()
     db.add(

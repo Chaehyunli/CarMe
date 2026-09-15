@@ -12,7 +12,7 @@ router = APIRouter(prefix="/vehicle-catalog", tags=["vehicles"])
 
 
 def active_catalog_statement() -> Select[tuple[VehicleCatalog]]:
-    """Return only publicly selectable models with a usable primary manual."""
+    """Return models whose READY representative manual permits public selection."""
 
     return (
         select(VehicleCatalog)

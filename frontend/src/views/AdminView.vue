@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import { apiFetch, clearAccessToken, restoreSession, type CurrentUser } from "../lib/api";
+import VehicleCatalogFields from "../components/VehicleCatalogFields.vue";
 
 interface Catalog {
   id: string;
@@ -37,6 +38,8 @@ const notice = ref("");
 const error = ref("");
 const savingCatalog = ref(false);
 const uploading = ref(false);
+const preparingManualId = ref<string | null>(null);
+const syncingOfficialCatalogId = ref<string | null>(null);
 const catalogForm = ref({ manufacturer: "HYUNDAI", model_name: "", model_year: new Date().getFullYear() });
 const manualForm = ref({ title: "", manual_type: "OWNER_MANUAL", locale: "ko-KR", catalog_ids: [] as string[] });
 const makePrimary = ref(true);
@@ -49,6 +52,10 @@ const savingEdit = ref(false);
 const selectedFile = ref<File | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedCatalogs = computed(() => catalogs.value.filter((catalog) => manualForm.value.catalog_ids.includes(catalog.id)));
+const accountLabel = computed(() => {
+  if (!user.value) return "사용자";
+  return user.value.role === "ADMIN" ? `관리자 ${user.value.display_name}` : user.value.display_name;
+});
 
 onMounted(async () => {
   try {
@@ -253,6 +260,39 @@ async function deleteManual(manual: Manual): Promise<void> {
   }
 }
 
+async function prepareRagTest(manual: Manual): Promise<void> {
+  error.value = "";
+  notice.value = "";
+  preparingManualId.value = manual.id;
+  try {
+    const result = await apiFetch<{ indexed_page_count: number }>(`/admin/manuals/${manual.id}/prepare-rag-test`, { method: "POST" });
+    notice.value = `${manual.title}의 ${result.indexed_page_count}쪽을 검색용으로 준비했습니다. 이제 사용자 화면에서 질문을 테스트할 수 있습니다.`;
+    await loadData();
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : "문서 테스트 준비를 완료하지 못했습니다.";
+    await loadData().catch(() => undefined);
+  } finally {
+    preparingManualId.value = null;
+  }
+}
+
+async function syncOfficialSources(catalog: Catalog): Promise<void> {
+  error.value = "";
+  notice.value = "";
+  syncingOfficialCatalogId.value = catalog.id;
+  try {
+    const result = await apiFetch<{ synced_count: number }>(
+      `/admin/vehicle-catalog/${catalog.id}/official-sources/sync`,
+      { method: "POST" },
+    );
+    notice.value = `${catalog.display_name}의 현대 공식 웹 매뉴얼 ${result.synced_count}건을 동기화했습니다.`;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : "공식 웹 매뉴얼을 동기화하지 못했습니다.";
+  } finally {
+    syncingOfficialCatalogId.value = null;
+  }
+}
+
 function canEditManual(manual: Manual): boolean {
   return ["DRAFT", "UPLOADED", "FAILED"].includes(manual.status);
 }
@@ -272,21 +312,21 @@ function formatSize(bytes: number): string {
   <div class="admin-page">
     <header class="admin-header">
       <RouterLink class="wordmark" to="/admin">CarMe</RouterLink>
-      <nav aria-label="관리자 메뉴"><a class="active" href="#vehicles">차량 카탈로그</a><a href="#manuals">매뉴얼 업로드</a></nav>
-      <div class="account-menu"><span>{{ user?.display_name }}</span><button type="button" @click="logout">로그아웃</button></div>
+      <nav aria-label="관리자 메뉴"><a class="active" href="#vehicles">차량 카탈로그</a><a href="#manuals">매뉴얼 업로드</a><RouterLink to="/app">사용자 화면 테스트</RouterLink></nav>
+      <div class="account-menu"><span>{{ accountLabel }}</span><button type="button" @click="logout">로그아웃</button></div>
     </header>
     <main class="admin-main">
       <div class="page-heading"><div><p class="kicker">ADMIN CONSOLE</p><h1>차량 매뉴얼 운영</h1><p>차량별 적용 매뉴얼을 등록하고, 검증된 PDF만 적재 흐름으로 보냅니다.</p></div><span class="role-badge">관리자</span></div>
       <p v-if="notice" class="notice success" role="status">{{ notice }}</p><p v-if="error" class="notice error" role="alert">{{ error }}</p>
       <section id="vehicles" class="work-section" aria-labelledby="vehicles-title">
         <div class="section-heading"><div><p class="section-label">01 · 차량 카탈로그</p><h2 id="vehicles-title">차량과 연식 등록</h2></div><span>{{ catalogs.length }}개 차량</span></div>
-        <form class="catalog-form" @submit.prevent="createCatalog"><label class="field"><span>제조사</span><input v-model="catalogForm.manufacturer" required /></label><label class="field"><span>차종</span><input v-model="catalogForm.model_name" placeholder="예: 아반떼" required /></label><label class="field"><span>연식</span><input v-model.number="catalogForm.model_year" min="1980" max="2100" required type="number" /></label><button class="button primary" :disabled="savingCatalog" type="submit">{{ savingCatalog ? "등록 중" : "차량 초안 추가" }}</button></form>
-        <div class="catalog-list"><div v-if="loading" class="empty-state">등록된 차량을 불러오는 중입니다.</div><div v-else-if="!catalogs.length" class="empty-state">먼저 차량과 연식을 등록해 주세요.</div><article v-for="catalog in catalogs" :key="catalog.id" class="catalog-row"><div v-if="editingCatalogId === catalog.id" class="inline-editor"><label class="field"><span>제조사</span><input v-model="catalogEdit.manufacturer" /></label><label class="field"><span>차종</span><input v-model="catalogEdit.model_name" /></label><label class="field"><span>연식</span><input v-model.number="catalogEdit.model_year" min="1980" max="2100" type="number" /></label></div><div v-else><strong>{{ catalog.display_name }}</strong><span>{{ catalog.manufacturer }} · {{ catalog.model_year }}년형</span></div><div class="catalog-meta"><span class="status-tag" :class="catalog.status.toLowerCase()">{{ catalog.status }}</span><span>준비된 매뉴얼 {{ catalog.ready_manual_count }}</span><div v-if="catalog.status === 'DRAFT'" class="row-actions"><template v-if="editingCatalogId === catalog.id"><button type="button" @click="saveCatalogEdit">저장</button><button type="button" @click="editingCatalogId = null">취소</button></template><template v-else><button type="button" @click="beginCatalogEdit(catalog)">수정</button><button class="danger" type="button" @click="deleteCatalog(catalog)">삭제</button></template></div></div></article></div>
+        <form class="catalog-form" @submit.prevent="createCatalog"><VehicleCatalogFields mode="entry" v-model:manufacturer="catalogForm.manufacturer" v-model:model-name="catalogForm.model_name" v-model:model-year="catalogForm.model_year" /><button class="button primary" :disabled="savingCatalog" type="submit">{{ savingCatalog ? "등록 중" : "차량 초안 추가" }}</button></form>
+        <div class="catalog-list"><div v-if="loading" class="empty-state">등록된 차량을 불러오는 중입니다.</div><div v-else-if="!catalogs.length" class="empty-state">먼저 차량과 연식을 등록해 주세요.</div><article v-for="catalog in catalogs" :key="catalog.id" class="catalog-row"><div v-if="editingCatalogId === catalog.id" class="inline-editor"><label class="field"><span>제조사</span><input v-model="catalogEdit.manufacturer" /></label><label class="field"><span>차종</span><input v-model="catalogEdit.model_name" /></label><label class="field"><span>연식</span><input v-model.number="catalogEdit.model_year" min="1980" max="2100" type="number" /></label></div><div v-else><strong>{{ catalog.display_name }}</strong><span>{{ catalog.manufacturer }} · {{ catalog.model_year }}년형</span></div><div class="catalog-meta"><span class="status-tag" :class="catalog.status.toLowerCase()">{{ catalog.status }}</span><span>준비된 매뉴얼 {{ catalog.ready_manual_count }}</span><button class="test-button" :disabled="syncingOfficialCatalogId === catalog.id" type="button" @click="syncOfficialSources(catalog)">{{ syncingOfficialCatalogId === catalog.id ? "공식 자료 동기화 중" : "공식 웹 매뉴얼 동기화" }}</button><div v-if="catalog.status === 'DRAFT'" class="row-actions"><template v-if="editingCatalogId === catalog.id"><button type="button" @click="saveCatalogEdit">저장</button><button type="button" @click="editingCatalogId = null">취소</button></template><template v-else><button type="button" @click="beginCatalogEdit(catalog)">수정</button><button class="danger" type="button" @click="deleteCatalog(catalog)">삭제</button></template></div></div></article></div>
       </section>
       <section id="manuals" class="work-section" aria-labelledby="manuals-title">
         <div class="section-heading"><div><p class="section-label">02 · 공식 매뉴얼</p><h2 id="manuals-title">PDF 매뉴얼 업로드</h2></div><span>PDF만 가능 · 최대 200 MB</span></div>
-        <form class="manual-form" @submit.prevent="uploadManual"><div class="manual-fields"><label class="field"><span>매뉴얼 제목</span><input v-model="manualForm.title" placeholder="예: 아반떼 2025 취급설명서" required /></label><label class="field"><span>종류</span><select v-model="manualForm.manual_type"><option value="OWNER_MANUAL">취급설명서</option><option value="QUICK_GUIDE">간편 안내서</option></select></label><label class="field"><span>언어</span><select v-model="manualForm.locale"><option value="ko-KR">한국어</option><option value="en-US">English</option></select></label></div><fieldset class="vehicle-selector"><legend>적용 차량</legend><p>이 매뉴얼을 적용할 차량을 선택하세요.</p><div class="checkbox-grid"><label v-for="catalog in catalogs" :key="catalog.id"><input v-model="manualForm.catalog_ids" :value="catalog.id" type="checkbox" /><span>{{ catalog.display_name }}</span></label></div><label class="primary-choice"><input v-model="makePrimary" type="checkbox" /><span>선택한 차량의 기본 매뉴얼로 지정</span></label></fieldset><label class="file-drop" :class="{ chosen: selectedFile }"><input ref="fileInput" accept="application/pdf,.pdf" type="file" @change="setFile" /><span class="file-title">{{ selectedFile ? selectedFile.name : "PDF 파일을 선택하세요" }}</span><small>{{ selectedFile ? formatSize(selectedFile.size) : "PDF · 최대 200 MB" }}</small></label><div class="upload-footer"><p v-if="selectedCatalogs.length">적용 대상: {{ selectedCatalogs.map((catalog) => catalog.display_name).join(", ") }}</p><p v-else>차량을 선택하면 매뉴얼 연결 대상이 표시됩니다.</p><button class="button primary" :disabled="uploading || !catalogs.length" type="submit">{{ uploading ? "파일 검증 중" : "매뉴얼 업로드" }}</button></div></form>
-        <div class="manual-history"><div v-if="!manuals.length" class="empty-state">아직 업로드한 매뉴얼이 없습니다.</div><article v-for="manual in manuals" :key="manual.id" class="manual-row"><div v-if="editingManualId === manual.id" class="manual-editor"><div class="manual-fields"><label class="field"><span>매뉴얼 제목</span><input v-model="manualEdit.title" /></label><label class="field"><span>종류</span><select v-model="manualEdit.manual_type"><option value="OWNER_MANUAL">취급설명서</option><option value="QUICK_GUIDE">간편 안내서</option></select></label><label class="field"><span>언어</span><select v-model="manualEdit.locale"><option value="ko-KR">한국어</option><option value="en-US">English</option></select></label></div><div class="checkbox-grid edit-catalogs"><label v-for="catalog in catalogs" :key="catalog.id"><input v-model="manualEdit.catalog_ids" :value="catalog.id" type="checkbox" /><span>{{ catalog.display_name }}</span></label></div><label class="primary-choice"><input v-model="editManualPrimary" type="checkbox" /><span>선택한 차량의 기본 매뉴얼로 지정</span></label><p class="edit-help">PDF 파일 자체를 바꾸려면 새 개정본으로 업로드해 주세요.</p></div><div v-else><strong>{{ manual.title }}</strong><span>{{ manual.applicable_catalogs.join(", ") }} · {{ manual.original_filename }}</span></div><div class="catalog-meta"><span class="status-tag" :class="manual.status.toLowerCase()">{{ manual.status }}</span><span>{{ manual.pdf_page_count ? `${manual.pdf_page_count}쪽` : formatSize(manual.file_size_bytes) }}</span><div v-if="canEditManual(manual)" class="row-actions"><template v-if="editingManualId === manual.id"><button type="button" @click="saveManualEdit">저장</button><button type="button" @click="editingManualId = null">취소</button></template><template v-else><button type="button" @click="beginManualEdit(manual)">수정</button><button class="danger" type="button" @click="deleteManual(manual)">삭제</button></template></div><button v-else class="text-delete" type="button" @click="deleteManual(manual)">삭제</button></div></article></div>
+        <form class="manual-form" @submit.prevent="uploadManual"><div class="manual-fields"><label class="field"><span>매뉴얼 제목</span><input v-model="manualForm.title" placeholder="예: 아반떼 2025 취급설명서" required /></label><label class="field"><span>종류</span><select v-model="manualForm.manual_type"><option value="OWNER_MANUAL">취급설명서</option><option value="QUICK_GUIDE">간편 안내서</option></select></label><label class="field"><span>언어</span><select v-model="manualForm.locale"><option value="ko-KR">한국어</option><option value="en-US">English</option></select></label></div><fieldset class="vehicle-selector"><legend>적용 차량</legend><p>이 매뉴얼을 적용할 차량을 선택하세요.</p><div class="checkbox-grid"><label v-for="catalog in catalogs" :key="catalog.id"><input v-model="manualForm.catalog_ids" :value="catalog.id" type="checkbox" /><span>{{ catalog.display_name }}</span></label></div><label class="primary-choice"><input v-model="makePrimary" type="checkbox" /><span>선택한 차량의 대표 매뉴얼로 지정</span></label><p class="edit-help">대표 매뉴얼은 차량 공개에 필요합니다. RAG는 이 차량에 연결된 모든 READY 매뉴얼을 검색합니다.</p></fieldset><label class="file-drop" :class="{ chosen: selectedFile }"><input ref="fileInput" accept="application/pdf,.pdf" type="file" @change="setFile" /><span class="file-title">{{ selectedFile ? selectedFile.name : "PDF 파일을 선택하세요" }}</span><small>{{ selectedFile ? formatSize(selectedFile.size) : "PDF · 최대 200 MB" }}</small></label><div class="upload-footer"><p v-if="selectedCatalogs.length">적용 대상: {{ selectedCatalogs.map((catalog) => catalog.display_name).join(", ") }}</p><p v-else>차량을 선택하면 매뉴얼 연결 대상이 표시됩니다.</p><button class="button primary" :disabled="uploading || !catalogs.length" type="submit">{{ uploading ? "파일 검증 중" : "매뉴얼 업로드" }}</button></div></form>
+        <div class="manual-history"><div v-if="!manuals.length" class="empty-state">아직 업로드한 매뉴얼이 없습니다.</div><article v-for="manual in manuals" :key="manual.id" class="manual-row"><div v-if="editingManualId === manual.id" class="manual-editor"><div class="manual-fields"><label class="field"><span>매뉴얼 제목</span><input v-model="manualEdit.title" /></label><label class="field"><span>종류</span><select v-model="manualEdit.manual_type"><option value="OWNER_MANUAL">취급설명서</option><option value="QUICK_GUIDE">간편 안내서</option></select></label><label class="field"><span>언어</span><select v-model="manualEdit.locale"><option value="ko-KR">한국어</option><option value="en-US">English</option></select></label></div><div class="checkbox-grid edit-catalogs"><label v-for="catalog in catalogs" :key="catalog.id"><input v-model="manualEdit.catalog_ids" :value="catalog.id" type="checkbox" /><span>{{ catalog.display_name }}</span></label></div><label class="primary-choice"><input v-model="editManualPrimary" type="checkbox" /><span>선택한 차량의 대표 매뉴얼로 지정</span></label><p class="edit-help">대표 매뉴얼은 차량 공개에 필요합니다. RAG는 연결된 모든 READY 매뉴얼을 검색합니다. PDF 파일 자체를 바꾸려면 새 개정본으로 업로드해 주세요.</p></div><div v-else><strong>{{ manual.title }}</strong><span>{{ manual.applicable_catalogs.join(", ") }} · {{ manual.original_filename }}</span></div><div class="catalog-meta"><span class="status-tag" :class="manual.status.toLowerCase()">{{ manual.status }}</span><span>{{ manual.pdf_page_count ? `${manual.pdf_page_count}쪽` : formatSize(manual.file_size_bytes) }}</span><div v-if="canEditManual(manual)" class="row-actions"><template v-if="editingManualId === manual.id"><button type="button" @click="saveManualEdit">저장</button><button type="button" @click="editingManualId = null">취소</button></template><template v-else><button type="button" @click="beginManualEdit(manual)">수정</button><button class="danger" type="button" @click="deleteManual(manual)">삭제</button></template></div><button v-if="manual.status === 'UPLOADED'" class="test-button" :disabled="preparingManualId === manual.id" type="button" @click="prepareRagTest(manual)">{{ preparingManualId === manual.id ? "문서 준비 중" : "RAG 테스트 준비" }}</button><button v-if="!canEditManual(manual)" class="text-delete" type="button" @click="deleteManual(manual)">삭제</button></div></article></div>
       </section>
     </main>
   </div>
