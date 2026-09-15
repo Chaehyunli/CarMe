@@ -17,7 +17,7 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -28,40 +28,20 @@ services:
     volumes:
       - minio_data:/data
 
-  api:
-    build:
-      context: ./backend
-    env_file:
-      - ./backend/.env
-    environment:
-      DATABASE_URL: postgresql+psycopg://carme:carme_local_password@db:5432/carme
-      S3_ENDPOINT_URL: http://minio:9000
+  # 모델 파일은 Docker volume에만 보관한다. frontend는 이 포트에 직접 접근하지 않는다.
+  ollama:
+    image: ollama/ollama:latest
     ports:
-      - "8000:8000"
+      - "127.0.0.1:11434:11434"
     volumes:
-      - ./backend:/app
-    depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_started
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  frontend:
-    build:
-      context: ./frontend
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
-    depends_on:
-      - api
-    command: npm run dev -- --host 0.0.0.0
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
 volumes:
   db_data:
   minio_data:
-  frontend_node_modules:
+  ollama_data:

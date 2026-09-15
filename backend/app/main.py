@@ -21,12 +21,8 @@ tags_metadata = [
         "description": "차량 카탈로그와 내 차량 관리 API입니다.",
     },
     {
-        "name": "conversations",
-        "description": "선택 차량 매뉴얼 기반 상담 API입니다.",
-    },
-    {
-        "name": "citations",
-        "description": "근거 원문 PDF URL 발급 API입니다.",
+        "name": "chat-sessions",
+        "description": "선택 차량 매뉴얼 기반의 비영구 단기 상담 API입니다.",
     },
     {
         "name": "admin",

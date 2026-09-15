@@ -4,42 +4,28 @@
 
 ## Swagger / OpenAPI
 
-개발 서버에서 아래 문서를 제공한다.
-
 | 문서 | 경로 |
 |---|---|
 | Swagger UI | `GET /docs` |
 | ReDoc | `GET /redoc` |
 | OpenAPI JSON | `GET /api/v1/openapi.json` |
 
-Swagger UI의 **Authorize** 버튼에는 `POST /auth/access-token`에서 발급받은 access JWT만 입력한다. 이후 구현되는 보호 endpoint에는 OpenAPI의 `bearerAuth` security requirement를 명시한다.
+보호 endpoint는 OpenAPI `bearerAuth`를 선언한다. Swagger UI의 Authorize에는 `POST /auth/access-token`이 발급한 access JWT를 넣는다.
 
 ## 1. 공통 규칙
 
-### 인증
-
-- 보호 API는 `Authorization: Bearer {access_jwt}`가 필요하다.
-- access JWT는 짧게 사용하고 frontend 메모리에만 보관한다.
-- refresh token은 backend가 `HttpOnly`, `Secure`(운영), `SameSite=Lax` cookie로 보관한다. DB에는 원문이 아닌 해시만 저장한다.
-- OAuth callback과 refresh API는 refresh cookie를 사용한다. 나머지 API는 access JWT를 사용한다.
-- refresh·logout 요청은 `Origin` 검증과 CSRF 방어를 적용한다. 운영에서 frontend와 API를 다른 site로 분리하면 `SameSite=None; Secure` 및 명시적 CSRF token 정책으로 전환한다.
-- 인증 실패는 `401`, 다른 사용자의 리소스 접근은 리소스 존재 여부와 무관하게 `403`을 반환한다.
-- 역할은 `USER`와 `ADMIN`이다. `/admin/*`은 `ADMIN` claim과 DB의 활성 사용자 상태를 모두 확인한다. 역할을 변경하는 공개 API는 없다.
-
-### 시간·식별자·페이지
-
-- 모든 식별자는 UUID 문자열이다.
-- 모든 시간은 ISO-8601 UTC 문자열이다.
-- `pdf_page_number`는 PDF 뷰어의 1부터 시작하는 물리 페이지다.
-- `printed_page_number`는 매뉴얼 본문 쪽수이며 없을 수 있다.
-
-### 공통 오류 응답
+- 보호 API는 `Authorization: Bearer {access_jwt}`가 필요하다. access JWT는 frontend 메모리에만 둔다.
+- refresh token은 `HttpOnly`, 운영에서는 `Secure`, 기본 `SameSite=Lax` cookie로 보관하고 DB에는 해시만 저장한다.
+- OAuth callback과 refresh API는 cookie를 사용한다. refresh/logout에는 Origin 검증과 CSRF 방어를 적용한다.
+- 인증 실패는 `401`, 타 사용자 리소스는 존재 여부와 무관하게 `403`이다.
+- 역할은 `USER`/`ADMIN`이며 `/admin/*`은 JWT claim과 DB 활성 상태를 함께 확인한다.
+- UUID와 UTC ISO-8601 시간을 쓴다. `pdf_page_number`는 PDF 물리 페이지(1부터), `printed_page_number`는 본문 쪽수다.
 
 ```json
 {
   "error": {
-    "code": "MANUAL_NOT_READY",
-    "message": "선택한 차량의 매뉴얼을 아직 준비하고 있습니다.",
+    "code": "CHAT_SESSION_EXPIRED",
+    "message": "채팅 세션이 종료되었습니다. 새로 시작해 주세요.",
     "request_id": "uuid"
   }
 }
@@ -48,277 +34,147 @@ Swagger UI의 **Authorize** 버튼에는 `POST /auth/access-token`에서 발급�
 | HTTP | code | 의미 |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | 형식·값 검증 실패 |
-| 401 | `UNAUTHENTICATED` | access JWT가 없거나 유효하지 않음 |
+| 401 | `UNAUTHENTICATED` | JWT가 없거나 유효하지 않음 |
 | 403 | `FORBIDDEN` | 소유자가 아닌 리소스 접근 |
-| 409 | `DUPLICATE_VEHICLE`, `IDEMPOTENCY_CONFLICT`, `CATALOG_NOT_PUBLISHABLE`, `MANUAL_STATE_CONFLICT` | 중복 요청 또는 공개·상태 전이 조건 불충족 |
-| 404 | `NOT_FOUND` | 공개적으로 존재를 확인해도 되는 리소스가 없음 |
+| 404 | `NOT_FOUND` | 공개적으로 확인해도 되는 리소스 없음 |
+| 409 | `DUPLICATE_VEHICLE`, `CATALOG_NOT_PUBLISHABLE`, `MANUAL_STATE_CONFLICT` | 중복·상태 전이 조건 불충족 |
+| 410 | `CHAT_SESSION_EXPIRED` | 메모리 세션이 종료·만료·재시작으로 사라짐 |
 | 422 | `UNSUPPORTED_VEHICLE`, `MANUAL_NOT_READY` | 지원되지 않거나 준비되지 않은 차량 |
-| 429 | `RATE_LIMITED` | 로그인·질문 요청 제한 초과 |
-| 500 | `INTERNAL_ERROR` | 내부 오류; 상세 원인·자격증명은 노출하지 않음 |
+| 429 | `RATE_LIMITED` | 로그인·질문 제한 초과 |
 
 ## 2. 인증 API
 
 ### `GET /auth/kakao/start`
 
-카카오 인가 화면으로 `302` redirect 한다. `state`는 서버가 생성·검증한다.
+카카오 인가 화면으로 `302` redirect 한다. 서버가 생성·검증한 `state`를 사용한다.
 
 ### `GET /auth/kakao/callback?code={code}&state={state}`
 
-카카오 인가 코드를 교환한다. 신규 사용자는 `kakao_subject` 기준으로 생성하고, refresh cookie를 설정한 뒤 frontend의 `/auth/callback?login=success`로 `302` redirect 한다. 실패 시 `/login?error={code}`로 redirect 한다.
+**backend callback URL**이다. 인가 코드를 교환해 `kakao_subject` 기준으로 사용자를 생성/조회하고 refresh cookie를 설정한 뒤, frontend `FRONTEND_LOGIN_CALLBACK_URL`의 `/auth/callback?login=success`로 `302` redirect 한다. 실패 시 frontend `/login?error={code}`로 redirect 한다.
 
 ### `POST /auth/access-token`
 
-refresh cookie를 검증해 새 access JWT를 발급한다.
-
-**200 response**
+refresh cookie를 검증해 access JWT를 발급한다.
 
 ```json
 {
   "access_token": "jwt",
   "token_type": "Bearer",
   "expires_in": 1800,
-  "user": {
-    "id": "uuid",
-    "display_name": "사용자",
-    "role": "USER"
-  }
+  "user": {"id": "uuid", "display_name": "사용자", "role": "USER"}
 }
 ```
 
-### `POST /auth/logout`
+### `POST /auth/logout` / `GET /auth/me`
 
-현재 refresh token을 폐기하고 cookie를 삭제한다. 응답은 `204 No Content`다.
+logout은 refresh token을 폐기·cookie 삭제하고 `204`를 반환한다. `GET /auth/me`는 현재 사용자 id, display_name, role, created_at을 반환한다.
 
-### `GET /auth/me`
+## 3. 차량 카탈로그와 내 차량
 
-현재 로그인 사용자를 반환한다.
-
-```json
-{
-  "id": "uuid",
-  "display_name": "사용자",
-  "role": "USER",
-  "created_at": "2026-09-14T00:00:00Z"
-}
-```
-
-## 3. 차량 카탈로그와 내 차량 API
-
-차량 선택값은 세부 옵션이 아닌 **차종·연식 단위**다. 초기 MVP에는 트림·옵션·하이브리드 등의 별도 모델 구분을 받지 않는다.
+초기 MVP 차량 선택값은 **모델 + 연식**만이다. 트림·옵션·하이브리드 등은 받지 않는다.
 
 ### `GET /vehicle-catalog`
 
-`ACTIVE`이며 `READY` 기본 매뉴얼이 하나 이상 연결된 등록 가능 차량을 반환한다.
+`ACTIVE`이면서 기본 `READY` 매뉴얼이 연결된 차량만 반환한다.
 
 ```json
-{
-  "items": [
-    {
-      "catalog_id": "uuid",
-      "manufacturer": "HYUNDAI",
-      "model_name": "아반떼",
-      "model_year": 2025,
-      "display_name": "아반떼 2025"
-    }
-  ]
-}
+{"items": [{"catalog_id": "uuid", "manufacturer": "HYUNDAI", "model_name": "아반떼", "model_year": 2025, "display_name": "아반떼 2025"}]}
 ```
 
 ### `POST /vehicles`
 
-**인증 필요.** 내 차량을 등록한다.
+**인증 필요.** `{ "catalog_id": "uuid", "nickname": "우리 차" }`로 내 차량을 만든다. 같은 사용자의 같은 catalog는 `409 DUPLICATE_VEHICLE`이다.
 
-```json
-{
-  "catalog_id": "uuid",
-  "nickname": "우리 차"
-}
-```
+### `GET /vehicles` / `GET /vehicles/{vehicleId}` / `PATCH /vehicles/{vehicleId}` / `DELETE /vehicles/{vehicleId}`
 
-**201 response**
+소유자만 조회·수정·삭제한다. PATCH는 별칭만 바꾼다. DELETE는 `vehicle.deleted_at`을 설정하고 `204`를 반환한다. 이 차량을 참조하는 살아 있는 메모리 세션은 즉시 제거한다.
 
-```json
-{
-  "id": "uuid",
-  "nickname": "우리 차",
-  "catalog": {
-    "id": "uuid",
-    "model_name": "아반떼",
-    "model_year": 2025,
-    "display_name": "아반떼 2025"
-  },
-  "manual_status": "READY",
-  "created_at": "2026-09-14T00:00:00Z"
-}
-```
+## 4. 단기 채팅 세션 API
 
-### `GET /vehicles`
+대화·질문·답변·citation은 영구 저장하지 않는다. `session_id`는 API 프로세스 RAM에서만 유효하며 화면 이탈의 `DELETE`, 30분 idle TTL, API 재시작/배포에서 사라진다.
 
-**인증 필요.** 현재 사용자의 차량 목록을 반환한다.
+### `POST /chat-sessions`
 
-### `GET /vehicles/{vehicleId}`
-
-**인증 필요.** 소유 차량 하나를 반환한다.
-
-### `PATCH /vehicles/{vehicleId}`
-
-**인증 필요.** 별칭만 수정한다.
-
-```json
-{ "nickname": "아빠 차" }
-```
-
-### `DELETE /vehicles/{vehicleId}`
-
-**인증 필요.** 차량 삭제 정책에 따라 soft delete 한다. 연결 상담 이력은 즉시 제거하지 않고, 계정·보존 정책에 따라 읽기 불가 상태로 전환한다. 응답은 `204 No Content`다.
-
-## 4. 상담 API
-
-### `POST /conversations`
-
-**인증 필요.** 선택 차량 기준의 새 상담을 시작한다.
+**인증 필요.** 질문 없이 선택 차량의 채팅 세션을 시작한다.
 
 ```json
 { "vehicle_id": "uuid" }
 ```
 
-질문 없이 생성할 수 있으며, 현재 차량 카탈로그에 연결된 `READY` 문서 목록을 반환한다. 상세 흐름은 [RAG 검색 및 근거 응답 상세 설계](./RAG_검색_및_근거응답_상세설계.md)를 따른다.
-
-**201 response**
-
 ```json
 {
-  "id": "uuid",
+  "id": "session-uuid",
   "vehicle_id": "uuid",
-  "status": "OPEN",
+  "expires_at": "2026-09-15T00:30:00Z",
   "manuals": [{
-    "id": "uuid",
-    "title": "선택 차량 취급설명서",
-    "manual_type": "OWNER_MANUAL",
-    "pdf_page_count": 444,
-    "is_primary": true,
-    "download_available": true
-  }],
-  "started_at": "2026-09-14T00:00:00Z"
+    "id": "manual-uuid", "title": "아반떼 2025 취급설명서",
+    "manual_type": "OWNER_MANUAL", "pdf_page_count": 444,
+    "is_primary": true, "download_available": true
+  }]
 }
 ```
 
-### `GET /conversations/{conversationId}/manuals`
+차량 소유권, `ACTIVE` 카탈로그, 현재 기본 `READY` 매뉴얼을 검증한다. 이 조건이 아니면 세션을 만들지 않는다.
 
-**인증 필요.** 현재 차량 카탈로그에 적용되는 `READY` 매뉴얼 목록을 반환한다.
+### `GET /chat-sessions/{sessionId}/manuals`
 
-### `POST /conversations/{conversationId}/manuals/{manualId}/download-url`
+**인증 필요.** 현재 적용되는 `READY` 매뉴얼 목록을 반환하고 idle TTL을 연장한다.
 
-**인증 필요.** 해당 대화에 연결된 매뉴얼의 private S3 PDF에 대한 짧은 만료 download URL을 발급한다. 대화 또는 문서가 요청 사용자에게 속하지 않으면 `403`을 반환한다.
+### `POST /chat-sessions/{sessionId}/manuals/{manualId}/download-url`
 
-### `GET /vehicles/{vehicleId}/conversations?cursor={cursor}&limit=20`
-
-**인증 필요.** 차량별 상담 이력을 최신순으로 반환한다.
+**인증 필요.** 세션 소유자만 호출한다. 해당 차량에 현재 적용되고 `READY`인 매뉴얼일 때만 5분 만료 private PDF URL을 발급한다.
 
 ```json
-{
-  "items": [{
-    "id": "uuid",
-    "status": "OPEN",
-    "last_result_status": "GROUNDED",
-    "last_message_preview": "에어컨이 약해요",
-    "updated_at": "2026-09-14T00:00:00Z"
-  }],
-  "next_cursor": null
-}
+{"url": "https://signed.example/...", "filename": "avante_2025_ko.pdf", "expires_at": "2026-09-15T00:05:00Z"}
 ```
 
-### `GET /conversations/{conversationId}`
+### `POST /chat-sessions/{sessionId}/messages`
 
-**인증 필요.** 대화와 근거 카드를 반환한다. 이력용 조회이므로 RAG를 재실행하지 않는다.
-
-### `POST /conversations/{conversationId}/messages`
-
-**인증 필요.** 질문을 저장하고 계층형 RAG를 실행한다. 같은 버튼을 두 번 눌러도 중복 답변이 생성되지 않도록 `Idempotency-Key` header를 권장한다.
-
-**request**
+**인증 필요.** 메모리 history에 현재 질문을 넣고, 매 요청마다 최신 `READY` 매뉴얼을 결정하여 계층형 RAG를 실행한다. `content`는 1–1,000자, `category`는 선택 사항이며 검색 강제 필터가 아니다.
 
 ```json
-{
-  "content": "내비게이션 화면이 켜지지 않아요.",
-  "category": "공조·편의"
-}
+{"content": "내비게이션 화면이 켜지지 않아요.", "category": "공조·편의"}
 ```
 
-`category`는 선택 사항이며 검색 범위를 제한하지 않는다. `content`는 1~1,000자다.
-
-**`GROUNDED` response — 201**
-
 ```json
 {
-  "question_message_id": "uuid",
-  "answer_message_id": "uuid",
   "result_status": "GROUNDED",
   "answer": "매뉴얼의 안내에 따라 ...",
   "citations": [{
-    "id": "uuid",
+    "manual_id": "manual-uuid",
     "manual_title": "아반떼 2025 취급설명서",
     "pdf_page_number": 87,
     "printed_page_number": "5-23",
-    "quote_text": "원문에서 추출한 인용문"
+    "quote_text": "원문에서 검증한 짧은 인용문"
   }],
   "clarifying_question": null,
-  "escalation": null
+  "escalation": null,
+  "expires_at": "2026-09-15T00:30:00Z"
 }
 ```
 
-**근거 부족·모호·안전 전환 response — 201**
-
-```json
-{
-  "question_message_id": "uuid",
-  "answer_message_id": "uuid",
-  "result_status": "INSUFFICIENT_EVIDENCE",
-  "answer": null,
-  "citations": [],
-  "clarifying_question": null,
-  "escalation": {
-    "type": "CUSTOMER_SUPPORT",
-    "title": "매뉴얼에서 확인하지 못했어요.",
-    "message": "공식 고객 지원 채널에서 확인해 주세요.",
-    "phone": null,
-    "url": null
-  }
-}
-```
-
-| `result_status` | 필수 값 | 금지 값 |
+| `result_status` | 필수 값 | citation |
 |---|---|---|
-| `GROUNDED` | `answer`, 인용 1개 이상 | 근거 없는 조치 |
-| `AMBIGUOUS` | `clarifying_question` | 해결책 단정 |
-| `INSUFFICIENT_EVIDENCE` | `escalation` | `answer`에 추정 해결책 |
-| `SAFETY_ESCALATION` | 우선 안전 `escalation` | 일반 RAG 답변 |
+| `GROUNDED` | `answer` | 1개 이상 |
+| `AMBIGUOUS` | `clarifying_question` | 없음 |
+| `INSUFFICIENT_EVIDENCE` | `escalation` | 없음 |
+| `SAFETY_ESCALATION` | 정적 안전 `escalation` | **없음** |
 
-### `POST /citations/{citationId}/document-url`
+### `DELETE /chat-sessions/{sessionId}`
 
-**인증 필요.** citation이 속한 차량·대화의 소유자에게만 private PDF의 짧은 만료 URL을 발급한다.
+**인증 필요.** 세션과 in-memory history를 즉시 파기하고 `204`를 반환한다. 이미 TTL/재시작으로 없어진 세션도 사용자 화면 이탈을 단순하게 처리할 수 있도록 `204`를 반환한다.
 
-**200 response**
-
-```json
-{
-  "url": "https://s3.example.com/...signed...#page=87",
-  "expires_at": "2026-09-14T00:05:00Z",
-  "pdf_page_number": 87
-}
-```
+과거 대화 목록, 과거 메시지 상세, citation ID 조회 API는 제공하지 않는다.
 
 ## 5. 사용자 삭제 API
 
 ### `DELETE /users/me`
 
-**인증 필요.** 계정 삭제 요청을 접수한다. refresh token을 폐기하고 로그인 세션을 종료한다. 차량·상담 이력·백업 삭제는 제품 보존 정책의 기한 안에 비동기 처리한다. 응답은 `202 Accepted`다.
+**인증 필요.** refresh token을 폐기하고 해당 사용자의 살아 있는 메모리 채팅 세션을 제거한다. 차량·계정의 soft delete 및 백업 삭제는 제품 보존 정책에 따라 비동기 처리하며 `202 Accepted`를 반환한다.
 
-## 6. 관리자 카탈로그·매뉴얼 API — 초기 MVP
+## 6. 관리자 카탈로그·매뉴얼 API
 
-모든 endpoint는 **`ADMIN` 권한 필요**다. 관리 화면에는 `아반떼 2025` 같은 표시명만 반환하며 내부 코드·object key·bucket은 반환하지 않는다. 초기에는 변경 이력을 별도 DB에 쌓지 않고 구조화 애플리케이션 로그에 남긴다.
-
-### 상태와 공개 조건
+모든 endpoint는 `ADMIN` 권한이 필요하다. UI 응답에는 `아반떼 2025` 같은 표시명만 포함하며 object key, bucket, 장기 자격증명은 포함하지 않는다. 초기 변경 이력은 별도 DB 대신 구조화 로그에 남긴다.
 
 ```text
 차량 카탈로그: DRAFT → ACTIVE → ARCHIVED
@@ -326,85 +182,28 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
                                   └──────→ FAILED → UPLOADED
 ```
 
-`ACTIVE` 전환은 연결된 기본(`is_primary = true`) 매뉴얼이 하나이고 그 상태가 `READY`일 때만 허용한다. 초기에는 평가 결과 테이블을 만들지 않는다. 적재 후 정해 둔 평가 질문을 수동/스크립트로 확인한다.
+`READY`는 파일 검증·추출·청킹·임베딩·매뉴얼 평가 세트 통과까지 끝난 상태다. `ACTIVE` 전환에는 `is_primary=true`인 `READY` 매뉴얼이 정확히 하나 필요하다.
 
-### `GET /admin/vehicle-catalog?status={status}&cursor={cursor}`
+### 차량 카탈로그
 
-차량 카탈로그 목록을 반환한다.
+- `GET /admin/vehicle-catalog?status=&cursor=`: 목록(모델명·연식·표시명·상태·ready_manual_count)
+- `POST /admin/vehicle-catalog`: `{manufacturer, model_name, model_year}`로 `DRAFT` 생성. 표시명은 서버 생성, 동일 조합은 `409`.
+- `GET/PATCH /admin/vehicle-catalog/{catalogId}`: 상세/수정 및 조건 충족 시 `ACTIVE` 공개.
 
-```json
-{
-  "items": [{
-    "id": "uuid",
-    "manufacturer": "HYUNDAI",
-    "model_name": "아반떼",
-    "model_year": 2025,
-    "display_name": "아반떼 2025",
-    "status": "DRAFT",
-    "ready_manual_count": 0
-  }],
-  "next_cursor": null
-}
-```
+### 매뉴얼
 
-### `POST /admin/vehicle-catalog`
+- `POST /admin/manuals`: 제목, 종류, 언어, 출처, 적용 `catalog_ids`, primary 대상 목록으로 `DRAFT` 생성.
+- `POST /admin/manuals/{manualId}/upload-url`: 짧은 만료의 범위 제한 presigned PUT URL 발급. 고유 staging key, 예상 MIME/크기/해시를 서버에 기록한다. presigned URL 자체를 “한 번만 사용 가능”하다고 가정하지 않는다.
+- `POST /admin/manuals/{manualId}/upload-complete`: object 존재, MIME, 크기, SHA-256, PDF 쪽수를 서버가 재검증하고 `UPLOADED` 후 worker를 요청한다.
+- `GET /admin/manuals/{manualId}` / `POST /admin/manuals/{manualId}/ingestions`: 상태·안전한 오류·사람이 읽는 적용 차량명 조회, 재적재 요청.
+- `POST /admin/manuals/{manualId}/archive`: 신규 세션/다운로드 대상에서 제외한다. 이미 진행 중인 메모리 세션도 다음 요청 때 현재 상태로 다시 판정한다.
 
-차종·연식 한 행을 `DRAFT`로 만든다. `display_name`은 서버가 생성한다.
+직접 브라우저 업로드를 허용하는 bucket은 admin frontend origin만 허용하는 CORS와 private bucket 정책을 별도로 설정한다.
 
-```json
-{
-  "manufacturer": "HYUNDAI",
-  "model_name": "아반떼",
-  "model_year": 2025
-}
-```
+## 7. Worker 작업
 
-동일 제조사·차종·연식이면 `409`다.
-
-### `GET /admin/vehicle-catalog/{catalogId}` / `PATCH /admin/vehicle-catalog/{catalogId}`
-
-상세에는 연결된 매뉴얼의 제목·문서 종류·상태만 담는다. `PATCH`는 `DRAFT`/`ARCHIVED` 상태와 표시용 이름을 수정하거나, 공개 조건을 만족할 때 `ACTIVE`로 전환한다.
-
-```json
-{ "status": "ACTIVE" }
-```
-
-### `POST /admin/manuals`
-
-PDF 업로드 전에 매뉴얼 초안을 만들고 적용 차량을 연결한다.
-
-```json
-{
-  "title": "아반떼 2025 취급설명서",
-  "manual_type": "OWNER_MANUAL",
-  "locale": "ko-KR",
-  "source_url": "https://source.example/manual",
-  "catalog_ids": ["uuid"],
-  "is_primary_for_catalog_ids": ["uuid"]
-}
-```
-
-### `POST /admin/manuals/{manualId}/upload-url`
-
-`DRAFT` 매뉴얼 하나에 대해 브라우저 직접 업로드용 1회성 private S3 `PUT` presigned URL을 발급한다. 파일명, PDF MIME, 크기, 예상 SHA-256을 검증한다. 응답에는 URL, 필요한 `Content-Type`, 만료 시각만 담고 object key·bucket은 담지 않는다.
-
-### `POST /admin/manuals/{manualId}/upload-complete`
-
-서버가 object 존재·MIME·크기·SHA-256·PDF 페이지 수를 재검증한 뒤 `UPLOADED`로 전환하고 worker를 요청한다. 응답은 `202 Accepted`다. 실패하면 `FAILED`와 안전한 오류 코드만 반환한다.
-
-### `GET /admin/manuals/{manualId}` / `POST /admin/manuals/{manualId}/ingestions`
-
-매뉴얼 메타데이터, 사람이 읽는 적용 차량명, 현재 상태, `ingestion_error`를 조회한다. 적재 실패는 재시도할 수 있다. `READY` 문서는 덮어쓰지 않으며 개정 PDF는 새 매뉴얼로 만든다.
-
-### `POST /admin/manuals/{manualId}/archive`
-
-새 등록·새 상담의 적용 대상에서 제외한다. 기존 답변은 `citation`에 저장한 매뉴얼·페이지 정보를 계속 표시한다.
-
-## 7. worker 작업
-
-관리자 API는 요청과 상태 조회만 담당한다. PDF 추출과 임베딩은 worker/CLI가 수행한다.
-
-1. 업로드 object 검증
-2. 목차 섹션과 페이지 번호가 포함된 청크 생성
-3. 임베딩 생성과 `manual_chunk` 저장
-4. 성공 시 `manual.status = READY`, 실패 시 `FAILED`와 `ingestion_error` 저장
+1. staging object를 재검증하고 최종 private object로 확정한다.
+2. 페이지 텍스트/OCR, 목차 섹션, 페이지 청크를 생성한다.
+3. 임베딩과 `manual_section`/`manual_chunk`를 저장한다.
+4. 매뉴얼 평가 세트를 실행·기록한다.
+5. 기준 통과 시 `READY`, 실패 시 `FAILED`와 안전한 `ingestion_error`를 저장한다.

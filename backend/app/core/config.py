@@ -20,13 +20,20 @@ class Settings(BaseSettings):
 
     kakao_rest_api_key: str = ""
     kakao_redirect_uri: str = ""
+    frontend_login_callback_url: str = "http://localhost:5173/auth/callback"
     jwt_secret: str
     jwt_access_ttl_minutes: int = 30
     jwt_refresh_ttl_days: int = 14
 
     openai_api_key: str = ""
     openai_chat_model: str = ""
-    embedding_model_name: str = "BAAI/bge-m3"
+    llm_provider: str = "ollama"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_chat_model: str = "qwen3:8b"
+    ollama_embedding_model: str = "qwen3-embedding:4b"
+    embedding_model_name: str = "qwen3-embedding:4b"
+    embedding_dimensions: int = 1024
+    chat_session_idle_ttl_minutes: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
