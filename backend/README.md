@@ -30,7 +30,7 @@ docker compose ps
 ```bash
 cd backend
 cp .env.example .env
-python3.12 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e '.[dev]'
