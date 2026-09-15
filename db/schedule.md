@@ -14,15 +14,15 @@
 
 - [ ] Alembic 초기화와 `vector` extension migration 작성
 - [ ] 사용자·refresh token·차량 카탈로그·차량 migration 작성
-- [ ] manual·manual applicability·ingestion run migration 작성
-- [ ] 목차 section·page·chunk·chunk-page와 pgvector column migration 작성
-- [ ] conversation·message·citation·retrieval run migration 작성
+- [ ] manual·manual applicability migration 작성
+- [ ] 목차 section·페이지 번호가 포함된 chunk와 pgvector column migration 작성
+- [ ] conversation·message·citation migration 작성
 - [ ] ERD의 UNIQUE, FK, soft delete, idempotency 제약 적용
 - [ ] ERD의 일반 인덱스와 성능 측정 후 HNSW 인덱스 적용
 
 ## 2. 데이터 품질·운영
 
-- [ ] CN7 예시 파일용 catalog variant, manual applicability seed 추가
-- [ ] 새 차종·연식 추가 시 catalog variant + manual applicability + 평가 세트를 같은 변경에 추가
+- [ ] CN7 예시 파일용 `vehicle_catalog`, manual applicability seed 추가
+- [ ] 새 차종·연식 추가 시 `vehicle_catalog` 한 행 + manual applicability + 평가 세트를 같은 변경에 추가
 - [ ] migration up/down 테스트와 빈 DB 기동 테스트
 - [ ] backup/restore와 계정 삭제 보존 정책 검증

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    .bg{fill:#F4F7F8}.surface{fill:#FFF;stroke:#CAD4DA;stroke-width:1}.mutedbg{fill:#E8EEF1}.ink{fill:#18232D;font-family:Pretendard,Arial,sans-serif}.muted{fill:#53616C;font-family:Pretendard,Arial,sans-serif}.accent{fill:#1F5E84}.small{font-size:13px}.body{font-size:16px}.title{font-size:27px;font-weight:700}.label{font-size:15px;font-weight:700}
+  </style>
+  <rect class="bg" width="390" height="844"/>
+  <text x="28" y="55" class="ink" font-size="21" font-weight="700" font-family="Pretendard,Arial,sans-serif">‹  내 차량 등록</text>
+  <text x="28" y="124" class="ink title">어떤 차량을 타고 계신가요?</text>
+  <text x="28" y="153" class="muted body">선택한 차량의 매뉴얼만 검색합니다.</text>
+  <text x="28" y="213" class="ink label">차량 모델</text>
+  <rect x="28" y="229" width="334" height="58" rx="14" class="surface"/>
+  <text x="48" y="265" class="ink body">아반떼</text><text x="337" y="265" text-anchor="end" class="muted body">⌄</text>
+  <text x="28" y="336" class="ink label">연식</text>
+  <rect x="28" y="352" width="334" height="58" rx="14" class="surface"/>
+  <text x="48" y="388" class="ink body">2025</text><text x="337" y="388" text-anchor="end" class="muted body">⌄</text>
+  <text x="28" y="459" class="ink label">차량 별칭 (선택)</text>
+  <rect x="28" y="475" width="334" height="58" rx="14" class="surface"/>
+  <text x="48" y="511" class="muted body">예: 우리 차</text>
+  <rect x="28" y="582" width="334" height="94" rx="14" class="mutedbg"/>
+  <text x="48" y="617" class="ink label">세부 옵션 구성은 확인하지 않아요.</text>
+  <text x="48" y="644" class="muted small">선택 차량에 연결된 통합 매뉴얼을 기준으로 안내합니다.</text>
+  <rect x="28" y="734" width="334" height="56" rx="14" class="accent"/>
+  <text x="195" y="769" text-anchor="middle" fill="#FFF" class="label" font-family="Pretendard,Arial,sans-serif">차량 등록하기</text>
+  <text x="28" y="822" class="muted small">02  차량 등록</text>
+</svg>

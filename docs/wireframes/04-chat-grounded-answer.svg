@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    .bg{fill:#F4F7F8}.surface{fill:#FFF;stroke:#CAD4DA;stroke-width:1}.mutedbg{fill:#E8EEF1}.ink{fill:#18232D;font-family:Pretendard,Arial,sans-serif}.muted{fill:#53616C;font-family:Pretendard,Arial,sans-serif}.accent{fill:#1F5E84}.small{font-size:13px}.body{font-size:15px}.title{font-size:20px;font-weight:700}.label{font-size:15px;font-weight:700}
+  </style>
+  <rect class="bg" width="390" height="844"/>
+  <rect x="0" y="0" width="390" height="72" fill="#FFF"/>
+  <text x="28" y="31" class="ink" font-size="19" font-weight="700" font-family="Pretendard,Arial,sans-serif">‹</text>
+  <text x="55" y="31" class="ink label">아반떼 2025</text><text x="55" y="52" class="muted small">차량 매뉴얼 상담</text>
+  <rect x="152" y="91" width="210" height="52" rx="16" class="accent"/>
+  <text x="257" y="113" text-anchor="middle" fill="#FFF" class="small" font-family="Pretendard,Arial,sans-serif">내 질문</text>
+  <text x="257" y="132" text-anchor="middle" fill="#FFF" class="body" font-family="Pretendard,Arial,sans-serif">경고등이 켜졌어요</text>
+  <rect x="28" y="164" width="306" height="226" rx="16" class="surface"/>
+  <text x="50" y="198" class="ink title">먼저 표시등 색상을 확인하세요.</text>
+  <text x="50" y="229" class="ink body">빨간색 표시등은 즉시 점검이 필요한</text>
+  <text x="50" y="252" class="ink body">상태일 수 있습니다. 안전한 곳에 정차한 뒤</text>
+  <text x="50" y="275" class="ink body">매뉴얼의 해당 항목을 확인해 보세요.</text>
+  <rect x="50" y="303" width="180" height="34" rx="10" class="mutedbg"/>
+  <text x="140" y="325" text-anchor="middle" class="ink small">주의사항이 포함되어 있어요</text>
+  <text x="50" y="369" class="muted small">근거 2개</text>
+  <rect x="28" y="410" width="334" height="104" rx="16" class="surface"/>
+  <text x="50" y="440" class="ink label">취급설명서 · PDF 6쪽</text>
+  <text x="50" y="466" class="muted small">경고, 주의 표시의 의미와 조치 방법...</text>
+  <text x="50" y="493" class="accent small">원문 보기 ›</text>
+  <rect x="28" y="528" width="334" height="104" rx="16" class="surface"/>
+  <text x="50" y="558" class="ink label">취급설명서 · PDF 146쪽</text>
+  <text x="50" y="584" class="muted small">클러스터 경고등 관련 안내...</text>
+  <text x="50" y="611" class="accent small">원문 보기 ›</text>
+  <text x="28" y="679" class="ink label">문제가 해결되었나요?</text>
+  <rect x="28" y="698" width="158" height="44" rx="14" class="accent"/><text x="107" y="726" text-anchor="middle" fill="#FFF" class="small" font-family="Pretendard,Arial,sans-serif">해결했어요</text>
+  <rect x="204" y="698" width="158" height="44" rx="14" class="surface"/><text x="283" y="726" text-anchor="middle" class="ink small">추가 질문</text>
+  <rect x="20" y="758" width="350" height="58" rx="16" class="surface"/><text x="40" y="794" class="muted body">질문을 입력하세요</text>
+  <text x="28" y="836" class="muted small">04  근거 있는 답변</text>
+</svg>

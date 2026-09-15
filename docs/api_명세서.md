@@ -24,6 +24,7 @@ Swagger UI의 **Authorize** 버튼에는 `POST /auth/access-token`에서 발급�
 - OAuth callback과 refresh API는 refresh cookie를 사용한다. 나머지 API는 access JWT를 사용한다.
 - refresh·logout 요청은 `Origin` 검증과 CSRF 방어를 적용한다. 운영에서 frontend와 API를 다른 site로 분리하면 `SameSite=None; Secure` 및 명시적 CSRF token 정책으로 전환한다.
 - 인증 실패는 `401`, 다른 사용자의 리소스 접근은 리소스 존재 여부와 무관하게 `403`을 반환한다.
+- 역할은 `USER`와 `ADMIN`이다. `/admin/*`은 `ADMIN` claim과 DB의 활성 사용자 상태를 모두 확인한다. 역할을 변경하는 공개 API는 없다.
 
 ### 시간·식별자·페이지
 
@@ -49,8 +50,8 @@ Swagger UI의 **Authorize** 버튼에는 `POST /auth/access-token`에서 발급�
 | 400 | `VALIDATION_ERROR` | 형식·값 검증 실패 |
 | 401 | `UNAUTHENTICATED` | access JWT가 없거나 유효하지 않음 |
 | 403 | `FORBIDDEN` | 소유자가 아닌 리소스 접근 |
+| 409 | `DUPLICATE_VEHICLE`, `IDEMPOTENCY_CONFLICT`, `CATALOG_NOT_PUBLISHABLE`, `MANUAL_STATE_CONFLICT` | 중복 요청 또는 공개·상태 전이 조건 불충족 |
 | 404 | `NOT_FOUND` | 공개적으로 존재를 확인해도 되는 리소스가 없음 |
-| 409 | `DUPLICATE_VEHICLE`, `IDEMPOTENCY_CONFLICT` | 중복 차량 또는 같은 요청 키의 다른 요청 |
 | 422 | `UNSUPPORTED_VEHICLE`, `MANUAL_NOT_READY` | 지원되지 않거나 준비되지 않은 차량 |
 | 429 | `RATE_LIMITED` | 로그인·질문 요청 제한 초과 |
 | 500 | `INTERNAL_ERROR` | 내부 오류; 상세 원인·자격증명은 노출하지 않음 |
@@ -78,7 +79,8 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
   "expires_in": 1800,
   "user": {
     "id": "uuid",
-    "display_name": "사용자"
+    "display_name": "사용자",
+    "role": "USER"
   }
 }
 ```
@@ -95,40 +97,27 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
 {
   "id": "uuid",
   "display_name": "사용자",
+  "role": "USER",
   "created_at": "2026-09-14T00:00:00Z"
 }
 ```
 
 ## 3. 차량 카탈로그와 내 차량 API
 
-차량 선택값은 세부 옵션이 아닌 **매뉴얼 적용 단위**다. `variant_code`는 하이브리드처럼 별도 매뉴얼을 고르는 데 필요한 경우에만 사용한다.
+차량 선택값은 세부 옵션이 아닌 **차종·연식 단위**다. 초기 MVP에는 트림·옵션·하이브리드 등의 별도 모델 구분을 받지 않는다.
 
-### `GET /vehicle-models`
+### `GET /vehicle-catalog`
 
-`READY` 매뉴얼이 하나 이상 적용된 등록 가능 모델을 반환한다.
-
-```json
-{
-  "items": [
-    {
-      "model_code": "CN7",
-      "display_name": "아반떼",
-      "years": [2025, 2026]
-    }
-  ]
-}
-```
-
-### `GET /vehicle-models/{modelCode}/years/{year}/variants`
-
-선택 모델·연식에 등록 가능한 모델 구분을 반환한다. 모델 구분이 필요 없으면 기본 variant 한 개를 반환한다.
+`ACTIVE`이며 `READY` 기본 매뉴얼이 하나 이상 연결된 등록 가능 차량을 반환한다.
 
 ```json
 {
   "items": [
     {
-      "catalog_variant_id": "uuid",
-      "variant_code": "STANDARD",
+      "catalog_id": "uuid",
+      "manufacturer": "HYUNDAI",
+      "model_name": "아반떼",
+      "model_year": 2025,
       "display_name": "아반떼 2025"
     }
   ]
@@ -141,7 +130,7 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
 
 ```json
 {
-  "catalog_variant_id": "uuid",
+  "catalog_id": "uuid",
   "nickname": "우리 차"
 }
 ```
@@ -152,10 +141,10 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
 {
   "id": "uuid",
   "nickname": "우리 차",
-  "catalog_variant": {
-    "model_code": "CN7",
+  "catalog": {
+    "id": "uuid",
+    "model_name": "아반떼",
     "model_year": 2025,
-    "variant_code": "STANDARD",
     "display_name": "아반떼 2025"
   },
   "manual_status": "READY",
@@ -193,6 +182,8 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
 { "vehicle_id": "uuid" }
 ```
 
+질문 없이 생성할 수 있으며, 현재 차량 카탈로그에 연결된 `READY` 문서 목록을 반환한다. 상세 흐름은 [RAG 검색 및 근거 응답 상세 설계](./RAG_검색_및_근거응답_상세설계.md)를 따른다.
+
 **201 response**
 
 ```json
@@ -200,9 +191,25 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
   "id": "uuid",
   "vehicle_id": "uuid",
   "status": "OPEN",
+  "manuals": [{
+    "id": "uuid",
+    "title": "선택 차량 취급설명서",
+    "manual_type": "OWNER_MANUAL",
+    "pdf_page_count": 444,
+    "is_primary": true,
+    "download_available": true
+  }],
   "started_at": "2026-09-14T00:00:00Z"
 }
 ```
+
+### `GET /conversations/{conversationId}/manuals`
+
+**인증 필요.** 현재 차량 카탈로그에 적용되는 `READY` 매뉴얼 목록을 반환한다.
+
+### `POST /conversations/{conversationId}/manuals/{manualId}/download-url`
+
+**인증 필요.** 해당 대화에 연결된 매뉴얼의 private S3 PDF에 대한 짧은 만료 download URL을 발급한다. 대화 또는 문서가 요청 사용자에게 속하지 않으면 `403`을 반환한다.
 
 ### `GET /vehicles/{vehicleId}/conversations?cursor={cursor}&limit=20`
 
@@ -307,14 +314,97 @@ refresh cookie를 검증해 새 access JWT를 발급한다.
 
 **인증 필요.** 계정 삭제 요청을 접수한다. refresh token을 폐기하고 로그인 세션을 종료한다. 차량·상담 이력·백업 삭제는 제품 보존 정책의 기한 안에 비동기 처리한다. 응답은 `202 Accepted`다.
 
-## 6. 비공개 운영 작업
+## 6. 관리자 카탈로그·매뉴얼 API — 초기 MVP
 
-매뉴얼 업로드·적재·재색인은 공개 HTTP API로 제공하지 않는다. backend의 운영자 CLI/worker에서만 수행하며, 결과는 `manual_ingestion_run`과 S3 manifest에 기록한다.
+모든 endpoint는 **`ADMIN` 권한 필요**다. 관리 화면에는 `아반떼 2025` 같은 표시명만 반환하며 내부 코드·object key·bucket은 반환하지 않는다. 초기에는 변경 이력을 별도 DB에 쌓지 않고 구조화 애플리케이션 로그에 남긴다.
 
-1. PDF 업로드
-2. 해시·MIME·페이지 수 검증
-3. 목차/섹션·페이지·청크·임베딩 생성
-4. 평가 게이트 통과
-5. `manual.status = READY`
+### 상태와 공개 조건
 
-이 작업이 완료된 뒤에만 해당 모델·연식이 `GET /vehicle-models`에 노출된다.
+```text
+차량 카탈로그: DRAFT → ACTIVE → ARCHIVED
+매뉴얼:         DRAFT → UPLOADED → INDEXING → READY → ARCHIVED
+                                  └──────→ FAILED → UPLOADED
+```
+
+`ACTIVE` 전환은 연결된 기본(`is_primary = true`) 매뉴얼이 하나이고 그 상태가 `READY`일 때만 허용한다. 초기에는 평가 결과 테이블을 만들지 않는다. 적재 후 정해 둔 평가 질문을 수동/스크립트로 확인한다.
+
+### `GET /admin/vehicle-catalog?status={status}&cursor={cursor}`
+
+차량 카탈로그 목록을 반환한다.
+
+```json
+{
+  "items": [{
+    "id": "uuid",
+    "manufacturer": "HYUNDAI",
+    "model_name": "아반떼",
+    "model_year": 2025,
+    "display_name": "아반떼 2025",
+    "status": "DRAFT",
+    "ready_manual_count": 0
+  }],
+  "next_cursor": null
+}
+```
+
+### `POST /admin/vehicle-catalog`
+
+차종·연식 한 행을 `DRAFT`로 만든다. `display_name`은 서버가 생성한다.
+
+```json
+{
+  "manufacturer": "HYUNDAI",
+  "model_name": "아반떼",
+  "model_year": 2025
+}
+```
+
+동일 제조사·차종·연식이면 `409`다.
+
+### `GET /admin/vehicle-catalog/{catalogId}` / `PATCH /admin/vehicle-catalog/{catalogId}`
+
+상세에는 연결된 매뉴얼의 제목·문서 종류·상태만 담는다. `PATCH`는 `DRAFT`/`ARCHIVED` 상태와 표시용 이름을 수정하거나, 공개 조건을 만족할 때 `ACTIVE`로 전환한다.
+
+```json
+{ "status": "ACTIVE" }
+```
+
+### `POST /admin/manuals`
+
+PDF 업로드 전에 매뉴얼 초안을 만들고 적용 차량을 연결한다.
+
+```json
+{
+  "title": "아반떼 2025 취급설명서",
+  "manual_type": "OWNER_MANUAL",
+  "locale": "ko-KR",
+  "source_url": "https://source.example/manual",
+  "catalog_ids": ["uuid"],
+  "is_primary_for_catalog_ids": ["uuid"]
+}
+```
+
+### `POST /admin/manuals/{manualId}/upload-url`
+
+`DRAFT` 매뉴얼 하나에 대해 브라우저 직접 업로드용 1회성 private S3 `PUT` presigned URL을 발급한다. 파일명, PDF MIME, 크기, 예상 SHA-256을 검증한다. 응답에는 URL, 필요한 `Content-Type`, 만료 시각만 담고 object key·bucket은 담지 않는다.
+
+### `POST /admin/manuals/{manualId}/upload-complete`
+
+서버가 object 존재·MIME·크기·SHA-256·PDF 페이지 수를 재검증한 뒤 `UPLOADED`로 전환하고 worker를 요청한다. 응답은 `202 Accepted`다. 실패하면 `FAILED`와 안전한 오류 코드만 반환한다.
+
+### `GET /admin/manuals/{manualId}` / `POST /admin/manuals/{manualId}/ingestions`
+
+매뉴얼 메타데이터, 사람이 읽는 적용 차량명, 현재 상태, `ingestion_error`를 조회한다. 적재 실패는 재시도할 수 있다. `READY` 문서는 덮어쓰지 않으며 개정 PDF는 새 매뉴얼로 만든다.
+
+### `POST /admin/manuals/{manualId}/archive`
+
+새 등록·새 상담의 적용 대상에서 제외한다. 기존 답변은 `citation`에 저장한 매뉴얼·페이지 정보를 계속 표시한다.
+
+## 7. worker 작업
+
+관리자 API는 요청과 상태 조회만 담당한다. PDF 추출과 임베딩은 worker/CLI가 수행한다.
+
+1. 업로드 object 검증
+2. 목차 섹션과 페이지 번호가 포함된 청크 생성
+3. 임베딩 생성과 `manual_chunk` 저장
+4. 성공 시 `manual.status = READY`, 실패 시 `FAILED`와 `ingestion_error` 저장

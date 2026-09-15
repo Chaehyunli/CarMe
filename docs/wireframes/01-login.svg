@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    .bg{fill:#F4F7F8}.surface{fill:#FFF;stroke:#CAD4DA;stroke-width:1}.ink{fill:#18232D;font-family:Pretendard,Arial,sans-serif}.muted{fill:#53616C;font-family:Pretendard,Arial,sans-serif}.accent{fill:#1F5E84}.small{font-size:13px}.body{font-size:16px}.title{font-size:34px;font-weight:700}.label{font-size:15px;font-weight:700}
+  </style>
+  <rect class="bg" width="390" height="844"/>
+  <text x="28" y="62" class="ink" font-size="24" font-weight="700" font-family="Pretendard,Arial,sans-serif">CarMe</text>
+  <rect x="28" y="176" width="334" height="314" rx="16" class="surface"/>
+  <text x="52" y="236" class="ink title">내 차 매뉴얼을</text>
+  <text x="52" y="278" class="ink title">더 쉽게</text>
+  <text x="52" y="325" class="muted body">선택한 차량의 공식 매뉴얼에서</text>
+  <text x="52" y="350" class="muted body">근거를 찾아 안내합니다.</text>
+  <rect x="52" y="402" width="286" height="56" rx="14" class="accent"/>
+  <text x="195" y="437" text-anchor="middle" fill="#FFF" class="label" font-family="Pretendard,Arial,sans-serif">카카오로 시작하기</text>
+  <text x="195" y="730" text-anchor="middle" class="muted small">CarMe는 현대자동차 공식 서비스가 아닙니다.</text>
+  <text x="195" y="752" text-anchor="middle" class="muted small">공식 매뉴얼을 참고해 안내합니다.</text>
+  <text x="28" y="814" class="muted small">01  로그인</text>
+</svg>

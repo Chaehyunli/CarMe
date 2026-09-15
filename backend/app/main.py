@@ -28,6 +28,10 @@ tags_metadata = [
         "name": "citations",
         "description": "근거 원문 PDF URL 발급 API입니다.",
     },
+    {
+        "name": "admin",
+        "description": "관리자 전용 차량 카탈로그와 매뉴얼 적재 운영 API입니다.",
+    },
 ]
 
 app = FastAPI(

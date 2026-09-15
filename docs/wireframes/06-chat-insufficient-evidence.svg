@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>.bg{fill:#F4F7F8}.surface{fill:#FFF;stroke:#CAD4DA;stroke-width:1}.mutedbg{fill:#E8EEF1}.ink{fill:#18232D;font-family:Pretendard,Arial,sans-serif}.muted{fill:#53616C;font-family:Pretendard,Arial,sans-serif}.accent{fill:#1F5E84}.small{font-size:13px}.body{font-size:15px}.title{font-size:20px;font-weight:700}.label{font-size:15px;font-weight:700}</style>
+  <rect class="bg" width="390" height="844"/><rect width="390" height="72" fill="#FFF"/>
+  <text x="28" y="31" class="ink" font-size="19" font-weight="700" font-family="Pretendard,Arial,sans-serif">‹</text><text x="55" y="31" class="ink label">아반떼 2025</text><text x="55" y="52" class="muted small">차량 매뉴얼 상담</text>
+  <rect x="148" y="91" width="214" height="52" rx="16" class="accent"/><text x="255" y="113" text-anchor="middle" fill="#FFF" class="small" font-family="Pretendard,Arial,sans-serif">내 질문</text><text x="255" y="132" text-anchor="middle" fill="#FFF" class="body" font-family="Pretendard,Arial,sans-serif">소모품 교체 비용은?</text>
+  <rect x="28" y="164" width="334" height="211" rx="16" class="surface"/><text x="50" y="199" class="ink title">매뉴얼에서 확인하지 못했어요.</text><text x="50" y="231" class="muted body">선택한 차량의 매뉴얼에는 비용 정보가</text><text x="50" y="254" class="muted body">포함되어 있지 않아요. 추측해서 안내하지</text><text x="50" y="277" class="muted body">않겠습니다.</text><rect x="50" y="302" width="199" height="37" rx="10" class="mutedbg"/><text x="149" y="326" text-anchor="middle" class="ink small">검색한 매뉴얼 항목 0개</text>
+  <text x="28" y="418" class="ink label">대신 이렇게 해보세요</text>
+  <rect x="28" y="436" width="334" height="72" rx="16" class="surface"/><text x="50" y="467" class="ink label">다른 표현으로 질문하기</text><text x="50" y="489" class="muted small">예: 엔진오일 교체 주기</text>
+  <rect x="28" y="522" width="334" height="72" rx="16" class="surface"/><text x="50" y="553" class="ink label">취급설명서 직접 확인하기</text><text x="50" y="575" class="muted small">적용 매뉴얼 PDF를 내려받을 수 있어요</text>
+  <rect x="28" y="623" width="334" height="48" rx="14" class="accent"/><text x="195" y="653" text-anchor="middle" fill="#FFF" class="body" font-family="Pretendard,Arial,sans-serif">매뉴얼 내려받기</text>
+  <rect x="20" y="758" width="350" height="58" rx="16" class="surface"/><text x="40" y="794" class="muted body">질문을 입력하세요</text><text x="28" y="836" class="muted small">06  근거 부족 응답</text>
+</svg>

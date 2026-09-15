@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>
+    .bg{fill:#F4F7F8}.surface{fill:#FFF;stroke:#CAD4DA;stroke-width:1}.mutedbg{fill:#E8EEF1}.ink{fill:#18232D;font-family:Pretendard,Arial,sans-serif}.muted{fill:#53616C;font-family:Pretendard,Arial,sans-serif}.accent{fill:#1F5E84}.small{font-size:13px}.body{font-size:16px}.title{font-size:24px;font-weight:700}.label{font-size:15px;font-weight:700}
+  </style>
+  <rect class="bg" width="390" height="844"/>
+  <rect x="0" y="0" width="390" height="82" fill="#FFF"/>
+  <text x="28" y="34" class="ink" font-size="19" font-weight="700" font-family="Pretendard,Arial,sans-serif">‹</text>
+  <text x="55" y="32" class="ink label">아반떼 2025</text>
+  <text x="55" y="54" class="muted small">차량 매뉴얼 상담</text>
+  <rect x="28" y="108" width="334" height="148" rx="16" class="surface"/>
+  <text x="50" y="143" class="ink label">선택 차량의 매뉴얼</text>
+  <text x="50" y="170" class="muted body">아반떼 2025 취급설명서</text>
+  <text x="50" y="194" class="muted small">PDF 444쪽 · 공식 매뉴얼</text>
+  <rect x="50" y="212" width="146" height="32" rx="10" class="accent"/>
+  <text x="123" y="233" text-anchor="middle" fill="#FFF" class="small" font-family="Pretendard,Arial,sans-serif">PDF 내려받기</text>
+  <text x="331" y="232" text-anchor="end" class="muted small">문서 정보 ›</text>
+  <text x="28" y="325" class="ink title">무엇이 불편하신가요?</text>
+  <text x="28" y="353" class="muted body">매뉴얼에 근거한 안내를 드릴게요.</text>
+  <text x="28" y="410" class="ink label">빠른 시작</text>
+  <rect x="28" y="429" width="157" height="44" rx="14" class="surface"/><text x="106" y="457" text-anchor="middle" class="ink small">시동 · 주행</text>
+  <rect x="205" y="429" width="157" height="44" rx="14" class="surface"/><text x="283" y="457" text-anchor="middle" class="ink small">경고등 · 클러스터</text>
+  <rect x="28" y="485" width="157" height="44" rx="14" class="surface"/><text x="106" y="513" text-anchor="middle" class="ink small">공조 · 편의</text>
+  <rect x="205" y="485" width="157" height="44" rx="14" class="surface"/><text x="283" y="513" text-anchor="middle" class="ink small">비상시</text>
+  <rect x="20" y="742" width="350" height="74" rx="16" class="surface"/>
+  <text x="40" y="785" class="muted body">문제 증상, 사용 방법을 입력하세요</text>
+  <rect x="312" y="754" width="46" height="46" rx="12" class="accent"/><text x="335" y="784" text-anchor="middle" fill="#FFF" font-size="20" font-family="Arial">↑</text>
+  <text x="28" y="835" class="muted small">03  빈 채팅방과 매뉴얼</text>
+</svg>

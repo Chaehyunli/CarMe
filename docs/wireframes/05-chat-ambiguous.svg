@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <style>.bg{fill:#F4F7F8}.surface{fill:#FFF;stroke:#CAD4DA;stroke-width:1}.mutedbg{fill:#E8EEF1}.ink{fill:#18232D;font-family:Pretendard,Arial,sans-serif}.muted{fill:#53616C;font-family:Pretendard,Arial,sans-serif}.accent{fill:#1F5E84}.small{font-size:13px}.body{font-size:15px}.title{font-size:20px;font-weight:700}.label{font-size:15px;font-weight:700}</style>
+  <rect class="bg" width="390" height="844"/><rect width="390" height="72" fill="#FFF"/>
+  <text x="28" y="31" class="ink" font-size="19" font-weight="700" font-family="Pretendard,Arial,sans-serif">‹</text><text x="55" y="31" class="ink label">아반떼 2025</text><text x="55" y="52" class="muted small">차량 매뉴얼 상담</text>
+  <rect x="145" y="91" width="217" height="52" rx="16" class="accent"/><text x="253" y="113" text-anchor="middle" fill="#FFF" class="small" font-family="Pretendard,Arial,sans-serif">내 질문</text><text x="253" y="132" text-anchor="middle" fill="#FFF" class="body" font-family="Pretendard,Arial,sans-serif">경고등이 켜졌어요</text>
+  <rect x="28" y="164" width="334" height="182" rx="16" class="surface"/><text x="50" y="199" class="ink title">어떤 표시등인지 알려주세요.</text><text x="50" y="230" class="muted body">색상이나 계기판 모양을 알려주시면</text><text x="50" y="253" class="muted body">맞는 매뉴얼 항목을 더 정확히 찾을 수 있어요.</text>
+  <text x="28" y="383" class="ink label">빠르게 선택하기</text>
+  <rect x="28" y="401" width="158" height="58" rx="14" class="surface"/><text x="107" y="436" text-anchor="middle" class="ink body">빨간색</text>
+  <rect x="204" y="401" width="158" height="58" rx="14" class="surface"/><text x="283" y="436" text-anchor="middle" class="ink body">노란색</text>
+  <rect x="28" y="473" width="334" height="58" rx="14" class="surface"/><text x="50" y="508" class="ink body">표시등 모양을 설명할게요</text><text x="338" y="508" text-anchor="end" class="accent body">›</text>
+  <rect x="28" y="560" width="334" height="76" rx="16" class="mutedbg"/><text x="50" y="591" class="ink label">안전 안내</text><text x="50" y="616" class="muted small">주행에 이상이 있으면 안전한 곳에 정차해 주세요.</text>
+  <rect x="20" y="758" width="350" height="58" rx="16" class="surface"/><text x="40" y="794" class="muted body">직접 입력하기</text><text x="28" y="836" class="muted small">05  추가 정보 요청</text>
+</svg>

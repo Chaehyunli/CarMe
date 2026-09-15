@@ -23,4 +23,4 @@
    - FastAPI docs: `http://localhost:8000/docs`
    - MinIO console: `http://localhost:9001`
 
-현재 API는 `/api/v1/health` 헬스체크만 제공합니다. 구현 순서는 [backend/schedul.md](backend/schedul.md), [frontend/schedul.md](frontend/schedul.md)를 따릅니다.
+현재 API는 `/api/v1/health` 헬스체크만 제공합니다. 구현 순서는 [backend/schedule.md](backend/schedule.md), [frontend/schedule.md](frontend/schedule.md), [db/schedule.md](db/schedule.md)를 따릅니다.
