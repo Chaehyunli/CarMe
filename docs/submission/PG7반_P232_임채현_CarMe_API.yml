@@ -1,0 +1,1620 @@
+openapi: 3.1.0
+info:
+  title: CarMe API
+  summary: 선택 차량 매뉴얼 기반 RAG 상담 API
+  description: 차량 선택으로 적용 매뉴얼을 결정하고, 매뉴얼 내부의 목차 섹션과 페이지 청크를 검색해 근거 기반 답변을 반환합니다. 이 OpenAPI YAML이 최신 API 계약의 기준입니다.
+  version: 0.1.0
+paths:
+  /api/v1/health:
+    get:
+      tags:
+      - system
+      summary: API 상태 확인
+      operationId: health_api_v1_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Api V1 Health Get
+  /api/v1/vehicle-catalog:
+    get:
+      tags:
+      - vehicles
+      summary: 등록 가능한 차량 카탈로그 조회
+      description: Expose display values only; internal object-storage details never join this response.
+      operationId: list_vehicle_catalog_api_v1_vehicle_catalog_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/VehicleCatalogResponse'
+                type: array
+                title: Response List Vehicle Catalog Api V1 Vehicle Catalog Get
+  /api/v1/vehicles:
+    get:
+      tags:
+      - vehicles
+      summary: List My Vehicles
+      operationId: list_my_vehicles_api_v1_vehicles_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UserVehicleResponse'
+                type: array
+                title: Response List My Vehicles Api V1 Vehicles Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - vehicles
+      summary: Add My Vehicle
+      operationId: add_my_vehicle_api_v1_vehicles_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserVehicleCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserVehicleResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/chat-sessions:
+    post:
+      tags:
+      - chat-sessions
+      summary: Start Chat
+      operationId: start_chat_api_v1_chat_sessions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatSessionCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/chat-sessions/{session_id}/manuals:
+    get:
+      tags:
+      - chat-sessions
+      summary: List Session Manuals
+      operationId: list_session_manuals_api_v1_chat_sessions__session_id__manuals_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatManualResponse'
+                title: Response List Session Manuals Api V1 Chat Sessions  Session Id  Manuals Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/chat-sessions/{session_id}/manuals/{manual_id}/download-url:
+    post:
+      tags:
+      - chat-sessions
+      summary: Download Url
+      operationId: download_url_api_v1_chat_sessions__session_id__manuals__manual_id__download_url_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/chat-sessions/{session_id}/messages:
+    post:
+      tags:
+      - chat-sessions
+      summary: Send Message
+      operationId: send_message_api_v1_chat_sessions__session_id__messages_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/chat-sessions/{session_id}:
+    delete:
+      tags:
+      - chat-sessions
+      summary: Close Chat
+      operationId: close_chat_api_v1_chat_sessions__session_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Session Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/kakao/start:
+    get:
+      tags:
+      - auth
+      summary: 카카오 로그인 시작
+      operationId: start_kakao_login_api_v1_auth_kakao_start_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/v1/auth/kakao/callback:
+    get:
+      tags:
+      - auth
+      summary: 카카오 로그인 콜백
+      operationId: kakao_callback_api_v1_auth_kakao_callback_get
+      parameters:
+      - name: code
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Code
+      - name: state
+        in: query
+        required: true
+        schema:
+          type: string
+          title: State
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/access-token:
+    post:
+      tags:
+      - auth
+      summary: access JWT 발급
+      operationId: issue_access_token_api_v1_auth_access_token_post
+      parameters:
+      - name: carme_refresh_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Carme Refresh Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/me:
+    get:
+      tags:
+      - auth
+      summary: 현재 사용자 조회
+      operationId: get_me_api_v1_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+      security:
+      - HTTPBearer: []
+  /api/v1/auth/onboarding:
+    post:
+      tags:
+      - auth
+      summary: 첫 로그인 역할 선택
+      operationId: complete_onboarding_api_v1_auth_onboarding_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: 로그아웃
+      operationId: logout_api_v1_auth_logout_post
+      parameters:
+      - name: carme_refresh_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Carme Refresh Token
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/vehicle-catalog:
+    get:
+      tags:
+      - admin-vehicle-catalog
+      summary: List Admin Catalogs
+      operationId: list_admin_catalogs_api_v1_admin_vehicle_catalog_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/AdminVehicleCatalogResponse'
+                type: array
+                title: Response List Admin Catalogs Api V1 Admin Vehicle Catalog Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - admin-vehicle-catalog
+      summary: Create Admin Catalog
+      operationId: create_admin_catalog_api_v1_admin_vehicle_catalog_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVehicleCatalogCreate'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVehicleCatalogResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/vehicle-catalog/{catalog_id}:
+    patch:
+      tags:
+      - admin-vehicle-catalog
+      summary: Update Admin Catalog
+      operationId: update_admin_catalog_api_v1_admin_vehicle_catalog__catalog_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: catalog_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Catalog Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVehicleCatalogUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVehicleCatalogResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - admin-vehicle-catalog
+      summary: Archive Admin Catalog
+      operationId: archive_admin_catalog_api_v1_admin_vehicle_catalog__catalog_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: catalog_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Catalog Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/vehicle-catalog/{catalog_id}/official-manual-url:
+    patch:
+      tags:
+      - admin-vehicle-catalog
+      summary: Update Catalog Official Manual Url
+      description: 'Save an admin-verified Hyundai manual root URL for any live catalog.
+
+
+        This is navigation metadata, not a request to scrape protected web pages.
+
+        It deliberately remains editable after the representative PDF activates a
+
+        catalog because Hyundai may change a web-manual route independently.'
+      operationId: update_catalog_official_manual_url_api_v1_admin_vehicle_catalog__catalog_id__official_manual_url_patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: catalog_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Catalog Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfficialManualUrlUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVehicleCatalogResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/vehicle-catalog/{catalog_id}/official-sources:
+    get:
+      tags:
+      - admin-vehicle-catalog
+      summary: List Official Sources
+      operationId: list_official_sources_api_v1_admin_vehicle_catalog__catalog_id__official_sources_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: catalog_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Catalog Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OfficialSourceResponse'
+                title: Response List Official Sources Api V1 Admin Vehicle Catalog  Catalog Id  Official Sources Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/vehicle-catalog/{catalog_id}/official-sources/sync:
+    post:
+      tags:
+      - admin-vehicle-catalog
+      summary: Sync Catalog Official Sources
+      operationId: sync_catalog_official_sources_api_v1_admin_vehicle_catalog__catalog_id__official_sources_sync_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: catalog_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Catalog Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfficialSourceSyncResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/manuals:
+    get:
+      tags:
+      - admin-manuals
+      summary: List Manuals
+      operationId: list_manuals_api_v1_admin_manuals_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ManualResponse'
+                type: array
+                title: Response List Manuals Api V1 Admin Manuals Get
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - admin-manuals
+      summary: Create Manual
+      operationId: create_manual_api_v1_admin_manuals_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualCreateRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/v1/admin/manuals/{manual_id}:
+    patch:
+      tags:
+      - admin-manuals
+      summary: Update Manual
+      operationId: update_manual_api_v1_admin_manuals__manual_id__patch
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ManualUpdateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - admin-manuals
+      summary: Archive Manual
+      operationId: archive_manual_api_v1_admin_manuals__manual_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/manuals/{manual_id}/upload-url:
+    post:
+      tags:
+      - admin-manuals
+      summary: Get Manual Upload Url
+      operationId: get_manual_upload_url_api_v1_admin_manuals__manual_id__upload_url_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/manuals/{manual_id}/upload-complete:
+    post:
+      tags:
+      - admin-manuals
+      summary: Complete Manual Upload
+      operationId: complete_manual_upload_api_v1_admin_manuals__manual_id__upload_complete_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadCompleteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/manuals/{manual_id}/prepare-rag-test:
+    post:
+      tags:
+      - admin-manuals
+      summary: Prepare Manual Rag Test
+      description: Extract and chunk an uploaded PDF, then expose it to the local user RAG test.
+      operationId: prepare_manual_rag_test_api_v1_admin_manuals__manual_id__prepare_rag_test_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualIndexResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/admin/manuals/{manual_id}/rebuild-rag-index:
+    post:
+      tags:
+      - admin-manuals
+      summary: Rebuild Manual Rag Index
+      description: Re-extract and re-embed an existing READY PDF after RAG changes.
+      operationId: rebuild_manual_rag_index_api_v1_admin_manuals__manual_id__rebuild_rag_index_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: manual_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Manual Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManualIndexResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    AccessTokenResponse:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: Bearer
+        expires_in:
+          type: integer
+          title: Expires In
+        user:
+          $ref: '#/components/schemas/UserResponse'
+      type: object
+      required:
+      - access_token
+      - expires_in
+      - user
+      title: AccessTokenResponse
+    AdminVehicleCatalogCreate:
+      properties:
+        manufacturer:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Manufacturer
+          default: HYUNDAI
+        model_name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Model Name
+        model_year:
+          type: integer
+          maximum: 2100.0
+          minimum: 1980.0
+          title: Model Year
+        official_manual_url:
+          anyOf:
+          - type: string
+            maxLength: 2083
+            minLength: 1
+            format: uri
+          - type: 'null'
+          title: Official Manual Url
+      type: object
+      required:
+      - model_name
+      - model_year
+      title: AdminVehicleCatalogCreate
+    AdminVehicleCatalogResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        manufacturer:
+          type: string
+          title: Manufacturer
+        model_name:
+          type: string
+          title: Model Name
+        model_year:
+          type: integer
+          title: Model Year
+        display_name:
+          type: string
+          title: Display Name
+        official_manual_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Official Manual Url
+        status:
+          $ref: '#/components/schemas/CatalogStatus'
+        ready_manual_count:
+          type: integer
+          title: Ready Manual Count
+          default: 0
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - manufacturer
+      - model_name
+      - model_year
+      - display_name
+      - status
+      - created_at
+      title: AdminVehicleCatalogResponse
+    AdminVehicleCatalogUpdate:
+      properties:
+        manufacturer:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Manufacturer
+          default: HYUNDAI
+        model_name:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Model Name
+        model_year:
+          type: integer
+          maximum: 2100.0
+          minimum: 1980.0
+          title: Model Year
+        official_manual_url:
+          anyOf:
+          - type: string
+            maxLength: 2083
+            minLength: 1
+            format: uri
+          - type: 'null'
+          title: Official Manual Url
+      type: object
+      required:
+      - model_name
+      - model_year
+      title: AdminVehicleCatalogUpdate
+    CatalogStatus:
+      type: string
+      enum:
+      - DRAFT
+      - ACTIVE
+      - ARCHIVED
+      title: CatalogStatus
+    ChatManualResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        manual_type:
+          type: string
+          title: Manual Type
+        pdf_page_count:
+          type: integer
+          title: Pdf Page Count
+        is_primary:
+          type: boolean
+          title: Is Primary
+        download_available:
+          type: boolean
+          title: Download Available
+          default: true
+      type: object
+      required:
+      - id
+      - title
+      - manual_type
+      - pdf_page_count
+      - is_primary
+      title: ChatManualResponse
+    ChatMessageCreate:
+      properties:
+        content:
+          type: string
+          maxLength: 1000
+          minLength: 1
+          title: Content
+        category:
+          anyOf:
+          - type: string
+            maxLength: 50
+          - type: 'null'
+          title: Category
+      type: object
+      required:
+      - content
+      title: ChatMessageCreate
+    ChatMessageResponse:
+      properties:
+        result_status:
+          type: string
+          title: Result Status
+        answer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Answer
+        citations:
+          items:
+            $ref: '#/components/schemas/CitationResponse'
+          type: array
+          title: Citations
+        clarifying_question:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Clarifying Question
+        escalation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Escalation
+        official_manual_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Official Manual Url
+        official_manual_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Official Manual Label
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      type: object
+      required:
+      - result_status
+      - expires_at
+      title: ChatMessageResponse
+    ChatSessionCreate:
+      properties:
+        vehicle_id:
+          type: string
+          format: uuid
+          title: Vehicle Id
+      type: object
+      required:
+      - vehicle_id
+      title: ChatSessionCreate
+    ChatSessionResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        vehicle_id:
+          type: string
+          format: uuid
+          title: Vehicle Id
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+        manuals:
+          items:
+            $ref: '#/components/schemas/ChatManualResponse'
+          type: array
+          title: Manuals
+      type: object
+      required:
+      - id
+      - vehicle_id
+      - expires_at
+      - manuals
+      title: ChatSessionResponse
+    CitationResponse:
+      properties:
+        manual_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Manual Id
+        manual_title:
+          type: string
+          title: Manual Title
+        pdf_page_number:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Pdf Page Number
+        printed_page_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Printed Page Number
+        quote_text:
+          type: string
+          title: Quote Text
+        source_type:
+          type: string
+          title: Source Type
+          default: PDF_MANUAL
+        source_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Url
+      type: object
+      required:
+      - manual_title
+      - quote_text
+      title: CitationResponse
+    DownloadResponse:
+      properties:
+        url:
+          type: string
+          title: Url
+        filename:
+          type: string
+          title: Filename
+        expires_at:
+          type: string
+          format: date-time
+          title: Expires At
+      type: object
+      required:
+      - url
+      - filename
+      - expires_at
+      title: DownloadResponse
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ManualCreateRequest:
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Title
+        manual_type:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Manual Type
+          default: OWNER_MANUAL
+        locale:
+          type: string
+          maxLength: 20
+          minLength: 2
+          title: Locale
+          default: ko-KR
+        source_url:
+          anyOf:
+          - type: string
+            maxLength: 2083
+            minLength: 1
+            format: uri
+          - type: 'null'
+          title: Source Url
+        catalog_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          minItems: 1
+          title: Catalog Ids
+        primary_catalog_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Primary Catalog Ids
+        original_filename:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Original Filename
+        sha256:
+          type: string
+          pattern: ^[a-fA-F0-9]{64}$
+          title: Sha256
+        file_size_bytes:
+          type: integer
+          maximum: 209715200.0
+          exclusiveMinimum: 0.0
+          title: File Size Bytes
+      type: object
+      required:
+      - title
+      - catalog_ids
+      - original_filename
+      - sha256
+      - file_size_bytes
+      title: ManualCreateRequest
+    ManualIndexResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        status:
+          $ref: '#/components/schemas/ManualStatus'
+        indexed_page_count:
+          type: integer
+          title: Indexed Page Count
+        indexing_total_chunks:
+          type: integer
+          title: Indexing Total Chunks
+          default: 0
+        embedded_chunk_count:
+          type: integer
+          title: Embedded Chunk Count
+          default: 0
+      type: object
+      required:
+      - id
+      - status
+      - indexed_page_count
+      title: ManualIndexResponse
+    ManualResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        title:
+          type: string
+          title: Title
+        manual_type:
+          type: string
+          title: Manual Type
+        locale:
+          type: string
+          title: Locale
+        status:
+          $ref: '#/components/schemas/ManualStatus'
+        original_filename:
+          type: string
+          title: Original Filename
+        file_size_bytes:
+          type: integer
+          title: File Size Bytes
+        pdf_page_count:
+          type: integer
+          title: Pdf Page Count
+        catalog_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Catalog Ids
+        primary_catalog_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Primary Catalog Ids
+        applicable_catalogs:
+          items:
+            type: string
+          type: array
+          title: Applicable Catalogs
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+        uploaded_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Uploaded At
+        ingestion_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ingestion Error
+        indexing_total_chunks:
+          type: integer
+          title: Indexing Total Chunks
+          default: 0
+        embedded_chunk_count:
+          type: integer
+          title: Embedded Chunk Count
+          default: 0
+      type: object
+      required:
+      - id
+      - title
+      - manual_type
+      - locale
+      - status
+      - original_filename
+      - file_size_bytes
+      - pdf_page_count
+      - catalog_ids
+      - primary_catalog_ids
+      - applicable_catalogs
+      title: ManualResponse
+    ManualStatus:
+      type: string
+      enum:
+      - DRAFT
+      - UPLOADED
+      - INDEXING
+      - READY
+      - FAILED
+      - ARCHIVED
+      title: ManualStatus
+    ManualUpdateRequest:
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Title
+        manual_type:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Manual Type
+        locale:
+          type: string
+          maxLength: 20
+          minLength: 2
+          title: Locale
+        catalog_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          minItems: 1
+          title: Catalog Ids
+        primary_catalog_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          title: Primary Catalog Ids
+      type: object
+      required:
+      - title
+      - manual_type
+      - locale
+      - catalog_ids
+      title: ManualUpdateRequest
+    OfficialManualUrlUpdate:
+      properties:
+        official_manual_url:
+          anyOf:
+          - type: string
+            maxLength: 2083
+            minLength: 1
+            format: uri
+          - type: 'null'
+          title: Official Manual Url
+      type: object
+      title: OfficialManualUrlUpdate
+    OfficialSourceResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        source_type:
+          type: string
+          title: Source Type
+        system_variant:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: System Variant
+        title:
+          type: string
+          title: Title
+        source_url:
+          type: string
+          title: Source Url
+        status:
+          type: string
+          title: Status
+        synced_at:
+          type: string
+          format: date-time
+          title: Synced At
+      type: object
+      required:
+      - id
+      - source_type
+      - title
+      - source_url
+      - status
+      - synced_at
+      title: OfficialSourceResponse
+    OfficialSourceSyncResponse:
+      properties:
+        catalog_id:
+          type: string
+          format: uuid
+          title: Catalog Id
+        synced_count:
+          type: integer
+          title: Synced Count
+        sources:
+          items:
+            $ref: '#/components/schemas/OfficialSourceResponse'
+          type: array
+          title: Sources
+      type: object
+      required:
+      - catalog_id
+      - synced_count
+      - sources
+      title: OfficialSourceSyncResponse
+    OnboardingRequest:
+      properties:
+        role:
+          $ref: '#/components/schemas/UserRole'
+        admin_code:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+          title: Admin Code
+      type: object
+      required:
+      - role
+      title: OnboardingRequest
+    UploadCompleteResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        status:
+          $ref: '#/components/schemas/ManualStatus'
+        pdf_page_count:
+          type: integer
+          title: Pdf Page Count
+      type: object
+      required:
+      - id
+      - status
+      - pdf_page_count
+      title: UploadCompleteResponse
+    UploadUrlResponse:
+      properties:
+        upload_url:
+          type: string
+          title: Upload Url
+        expires_in:
+          type: integer
+          title: Expires In
+        required_headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Required Headers
+      type: object
+      required:
+      - upload_url
+      - expires_in
+      - required_headers
+      title: UploadUrlResponse
+    UserResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        display_name:
+          type: string
+          title: Display Name
+        role:
+          $ref: '#/components/schemas/UserRole'
+        onboarding_completed:
+          type: boolean
+          title: Onboarding Completed
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - display_name
+      - role
+      - onboarding_completed
+      - created_at
+      title: UserResponse
+    UserRole:
+      type: string
+      enum:
+      - USER
+      - ADMIN
+      title: UserRole
+    UserVehicleCreate:
+      properties:
+        catalog_id:
+          type: string
+          format: uuid
+          title: Catalog Id
+        nickname:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Nickname
+      type: object
+      required:
+      - catalog_id
+      - nickname
+      title: UserVehicleCreate
+    UserVehicleResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        catalog_id:
+          type: string
+          format: uuid
+          title: Catalog Id
+        nickname:
+          type: string
+          title: Nickname
+        display_name:
+          type: string
+          title: Display Name
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - catalog_id
+      - nickname
+      - display_name
+      - created_at
+      title: UserVehicleResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VehicleCatalogResponse:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        manufacturer:
+          type: string
+          title: Manufacturer
+        model_name:
+          type: string
+          title: Model Name
+        model_year:
+          type: integer
+          title: Model Year
+        display_name:
+          type: string
+          title: Display Name
+        status:
+          $ref: '#/components/schemas/CatalogStatus'
+      type: object
+      required:
+      - id
+      - manufacturer
+      - model_name
+      - model_year
+      - display_name
+      - status
+      title: VehicleCatalogResponse
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: '`POST /auth/access-token`에서 받은 access JWT를 입력합니다.'
+tags:
+- name: system
+  description: 서비스 상태 확인 API입니다.
+- name: auth
+  description: 카카오 OAuth와 JWT 세션 API입니다.
+- name: vehicles
+  description: 차량 카탈로그와 내 차량 관리 API입니다.
+- name: chat-sessions
+  description: 선택 차량 매뉴얼 기반의 비영구 단기 상담 API입니다.
+- name: admin-vehicle-catalog
+  description: 관리자 전용 차량 카탈로그와 공식 소스 운영 API입니다.
+- name: admin-manuals
+  description: 관리자 전용 PDF 매뉴얼 업로드와 RAG 인덱싱 운영 API입니다.
+servers:
+- url: http://localhost:8000
+  description: 로컬 개발 서버, 모든 경로는 /api/v1로 시작

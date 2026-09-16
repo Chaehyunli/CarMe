@@ -42,7 +42,7 @@ from app.services.official_source_sync import (
 )
 from app.services.storage import PrivateStorage
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin")
 
 
 def catalog_response(catalog: VehicleCatalog, ready_manual_count: int = 0) -> AdminVehicleCatalogResponse:
@@ -59,7 +59,11 @@ def catalog_response(catalog: VehicleCatalog, ready_manual_count: int = 0) -> Ad
     )
 
 
-@router.get("/vehicle-catalog", response_model=list[AdminVehicleCatalogResponse])
+@router.get(
+    "/vehicle-catalog",
+    response_model=list[AdminVehicleCatalogResponse],
+    tags=["admin-vehicle-catalog"],
+)
 def list_admin_catalogs(
     _: User = Depends(require_admin), db: Session = Depends(get_db)
 ) -> list[AdminVehicleCatalogResponse]:
@@ -79,6 +83,7 @@ def list_admin_catalogs(
     "/vehicle-catalog",
     response_model=AdminVehicleCatalogResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=["admin-vehicle-catalog"],
 )
 def create_admin_catalog(
     payload: AdminVehicleCatalogCreate,
@@ -110,7 +115,11 @@ def create_admin_catalog(
     return catalog_response(catalog)
 
 
-@router.patch("/vehicle-catalog/{catalog_id}", response_model=AdminVehicleCatalogResponse)
+@router.patch(
+    "/vehicle-catalog/{catalog_id}",
+    response_model=AdminVehicleCatalogResponse,
+    tags=["admin-vehicle-catalog"],
+)
 def update_admin_catalog(
     catalog_id: UUID,
     payload: AdminVehicleCatalogUpdate,
@@ -142,7 +151,11 @@ def update_admin_catalog(
     return catalog_response(catalog)
 
 
-@router.patch("/vehicle-catalog/{catalog_id}/official-manual-url", response_model=AdminVehicleCatalogResponse)
+@router.patch(
+    "/vehicle-catalog/{catalog_id}/official-manual-url",
+    response_model=AdminVehicleCatalogResponse,
+    tags=["admin-vehicle-catalog"],
+)
 def update_catalog_official_manual_url(
     catalog_id: UUID,
     payload: OfficialManualUrlUpdate,
@@ -167,6 +180,7 @@ def update_catalog_official_manual_url(
 @router.get(
     "/vehicle-catalog/{catalog_id}/official-sources",
     response_model=list[OfficialSourceResponse],
+    tags=["admin-vehicle-catalog"],
 )
 def list_official_sources(
     catalog_id: UUID,
@@ -182,6 +196,7 @@ def list_official_sources(
 @router.post(
     "/vehicle-catalog/{catalog_id}/official-sources/sync",
     response_model=OfficialSourceSyncResponse,
+    tags=["admin-vehicle-catalog"],
 )
 async def sync_catalog_official_sources(
     catalog_id: UUID,
@@ -202,7 +217,11 @@ async def sync_catalog_official_sources(
     )
 
 
-@router.delete("/vehicle-catalog/{catalog_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/vehicle-catalog/{catalog_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["admin-vehicle-catalog"],
+)
 def archive_admin_catalog(
     catalog_id: UUID,
     _: User = Depends(require_admin),
@@ -220,7 +239,12 @@ def archive_admin_catalog(
     db.commit()
 
 
-@router.post("/manuals", response_model=ManualResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/manuals",
+    response_model=ManualResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["admin-manuals"],
+)
 def create_manual(
     payload: ManualCreateRequest,
     current_user: User = Depends(require_admin),
@@ -271,7 +295,7 @@ def create_manual(
     return manual_response(manual, catalogs, primary_ids)
 
 
-@router.get("/manuals", response_model=list[ManualResponse])
+@router.get("/manuals", response_model=list[ManualResponse], tags=["admin-manuals"])
 def list_manuals(
     _: User = Depends(require_admin), db: Session = Depends(get_db)
 ) -> list[ManualResponse]:
@@ -304,7 +328,7 @@ def list_manuals(
     return result
 
 
-@router.patch("/manuals/{manual_id}", response_model=ManualResponse)
+@router.patch("/manuals/{manual_id}", response_model=ManualResponse, tags=["admin-manuals"])
 def update_manual(
     manual_id: UUID,
     payload: ManualUpdateRequest,
@@ -351,7 +375,11 @@ def update_manual(
     return manual_response(manual, catalogs, primary_ids)
 
 
-@router.delete("/manuals/{manual_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/manuals/{manual_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["admin-manuals"],
+)
 def archive_manual(
     manual_id: UUID,
     _: User = Depends(require_admin),
@@ -368,7 +396,11 @@ def archive_manual(
     db.commit()
 
 
-@router.post("/manuals/{manual_id}/upload-url", response_model=UploadUrlResponse)
+@router.post(
+    "/manuals/{manual_id}/upload-url",
+    response_model=UploadUrlResponse,
+    tags=["admin-manuals"],
+)
 def get_manual_upload_url(
     manual_id: UUID,
     _: User = Depends(require_admin),
@@ -397,7 +429,11 @@ def get_manual_upload_url(
     )
 
 
-@router.post("/manuals/{manual_id}/upload-complete", response_model=UploadCompleteResponse)
+@router.post(
+    "/manuals/{manual_id}/upload-complete",
+    response_model=UploadCompleteResponse,
+    tags=["admin-manuals"],
+)
 def complete_manual_upload(
     manual_id: UUID,
     _: User = Depends(require_admin),
@@ -429,7 +465,11 @@ def complete_manual_upload(
     return UploadCompleteResponse(id=manual.id, status=manual.status, pdf_page_count=page_count)
 
 
-@router.post("/manuals/{manual_id}/prepare-rag-test", response_model=ManualIndexResponse)
+@router.post(
+    "/manuals/{manual_id}/prepare-rag-test",
+    response_model=ManualIndexResponse,
+    tags=["admin-manuals"],
+)
 def prepare_manual_rag_test(
     manual_id: UUID,
     background_tasks: BackgroundTasks,
@@ -453,7 +493,11 @@ def prepare_manual_rag_test(
     )
 
 
-@router.post("/manuals/{manual_id}/rebuild-rag-index", response_model=ManualIndexResponse)
+@router.post(
+    "/manuals/{manual_id}/rebuild-rag-index",
+    response_model=ManualIndexResponse,
+    tags=["admin-manuals"],
+)
 def rebuild_manual_rag_index(
     manual_id: UUID,
     background_tasks: BackgroundTasks,

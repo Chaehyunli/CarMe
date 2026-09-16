@@ -215,6 +215,8 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
             intent = "casual"
         else:
             intent = "manual_question"
+        if topic is not None and topic.key == "bluetooth" and intent != "symptom":
+            retrieval_query = _expand_bluetooth_procedure_query(retrieval_query)
         if intent == "vehicle_options":
             retrieval_query = f"{retrieval_query} 선택 사양 미장착 사양표시 트림"
         return QueryAnalysis(
@@ -398,6 +400,13 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
         hits: list[RetrievalHit] = []
         for chunk in candidate_list:
             text = chunk.content.lower()
+            # Official web-manual sections carry their navigation heading in
+            # `title`.  A heading such as "기기 등록하기" is a much stronger
+            # match for a how-to request than a FAQ body that merely mentions
+            # every Bluetooth feature once.
+            heading = str(getattr(chunk, "title", "")).lower()
+            heading_score = sum(4.0 for token in query_tokens if token in heading)
+            heading_score += sum(8.0 for phrase in query_phrases if phrase in heading)
             if analysis.topic is not None:
                 matched = tuple(alias for alias in analysis.topic.aliases if alias in text)
                 asked_aliases = tuple(alias for alias in analysis.topic.aliases if alias in analysis.retrieval_query.lower())
@@ -423,7 +432,7 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
                 if text.find(term) >= 0 and text.find(term) < 320
             )
             phrase_score = sum(5.0 for phrase in query_phrases if phrase in text)
-            score = topic_score + lexical_score + overview_score + action_score + early_match_score + phrase_score
+            score = topic_score + lexical_score + overview_score + action_score + early_match_score + phrase_score + heading_score
             if analysis.is_diagnosis or analysis.has_symptom:
                 score += diagnostic_signals
             if score > 0:
@@ -461,11 +470,13 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
             and analysis.topic.key == "bluetooth"
             and analysis.intent != "symptom"
             and any(cue in analysis.normalized_question for cue in ("연결", "등록", "페어링", "설정"))
+            and getattr(top.chunk, "source_type", None) == "INFOTAINMENT_WEB_MANUAL"
             and not _has_bluetooth_pairing_procedure(top.chunk.content)
         ):
-            # The owner PDFs explicitly delegate changing infotainment steps
-            # to the web manual. A generic hands-free safety page is not a
-            # pairing procedure and must not be presented as one.
+            # A generic web-search synopsis is not a pairing procedure and
+            # must not be presented as one.  Concise PDF passages remain
+            # valid official evidence; only cached web-manual sections must
+            # prove that their detailed procedure was actually collected.
             return EvidenceDecision("INSUFFICIENT_EVIDENCE", (), "블루투스 연결 절차의 직접 근거 없음")
         if analysis.intent not in {"manual_overview", "symptom"} and top.query_coverage < 0.2:
             return EvidenceDecision("INSUFFICIENT_EVIDENCE", (), "질문의 고유 표현과 근거가 연결되지 않음")
@@ -555,9 +566,39 @@ def _has_navigation_reset_procedure(content: str) -> bool:
     )
 
 
+def _expand_bluetooth_procedure_query(query: str) -> str:
+    """Disambiguate a short Bluetooth request toward a real manual procedure.
+
+    "블루투스 연결 방법" normally means first-time pairing.  The web manual
+    has separate pages for registration, reconnecting an existing device, and
+    disconnection, so add only the matching manual labels instead of allowing
+    broad phone or music safety text to win the ranking.
+    """
+    lowered = query.lower()
+    if any(term in lowered for term in ("해제", "끊", "삭제")):
+        return f"{query} 등록된 기기 연결 해제 기기 아이콘"
+    if any(term in lowered for term in ("등록된", "다시 연결", "재연결")):
+        return f"{query} 등록된 기기 연결 기기 아이콘"
+    if any(term in lowered for term in ("음악", "오디오", "미디어")):
+        return query
+    return f"{query} 기기 등록 신규 추가 설정 기기 연결"
+
+
 def _has_bluetooth_pairing_procedure(content: str) -> bool:
     compact = " ".join(content.split())
-    return any(term in compact for term in ("기기 등록", "기기 추가", "페어링", "블루투스 연결 설정", "연결 방법"))
+    # A short web-search synopsis can contain only a heading such as
+    # "기기 등록하기".  Treat it as evidence only when it also contains a
+    # concrete, ordered operation from the official web manual.
+    has_topic = any(
+        term in compact
+        for term in ("기기 등록", "기기 추가", "페어링", "등록된 기기", "블루투스 연결 설정")
+    )
+    has_step = bool(re.search(r"(?:^|\s)1[.)]\s", compact))
+    has_operation = any(
+        term in compact
+        for term in ("신규 추가", "기기의 아이콘", "기기 연결을 누르", "연결을 승인", "기기 삭제")
+    )
+    return has_topic and has_step and has_operation
 
 
 def insufficient_evidence_answer() -> str:

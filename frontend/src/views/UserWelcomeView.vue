@@ -93,7 +93,11 @@ async function startSession(): Promise<void> {
   try {
     const vehicle = await vehicleForSelectedCatalog();
     await closeSession();
-    session.value = await apiFetch<Session>("/chat-sessions", { method: "POST", body: JSON.stringify({ vehicle_id: vehicle.id }) });
+    const createdSession = await apiFetch<Session>("/chat-sessions", { method: "POST", body: JSON.stringify({ vehicle_id: vehicle.id }) });
+    // 세션을 만든 직후 다시 조회해 현재 READY 연결 문서를 사이드바에 표시한다.
+    // 관리자 변경 직후에도 세션 생성 응답에 남은 이전 목록을 보여 주지 않기 위한 갱신이다.
+    const manuals = await apiFetch<Manual[]>(`/chat-sessions/${createdSession.id}/manuals`);
+    session.value = { ...createdSession, manuals };
     messages.value = [{ role: "assistant", text: "선택한 차량의 준비된 매뉴얼만 검색해 답합니다. 불편한 기능이나 화면 문구를 질문해 보세요." }];
   } catch (caught) { error.value = caught instanceof Error ? caught.message : "대화를 시작하지 못했습니다."; }
   finally { starting.value = false; }

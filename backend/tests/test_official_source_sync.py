@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from app.services.official_source_sync import (
     _declared_infotaiment_variants,
+    _extract_official_manual_links,
     _is_allowed_official_url,
     _is_catalog_source,
     _is_system_manual_source,
@@ -56,3 +57,20 @@ def test_vehicle_manual_index_requires_exact_model_and_year() -> None:
 
 def test_web_excerpt_is_compacted_before_becoming_rag_context() -> None:
     assert _normalize_content("  블루투스 연결  \n\n  문제 해결  ") == "블루투스 연결\n문제 해결"
+
+
+def test_ivi_manual_crawler_uses_static_menu_and_section_links_only() -> None:
+    root = "https://ownersmanual.hyundai.com/ivi/STD_GEN5W/AVNT/KOR/Korean/"
+    html = """
+    <a href="007_Calling_btconnect.html#d2e17147">등록된 기기 연결하기</a>
+    <a onclick="mainHover('006_Navigation.html')">내비게이션</a>
+    <div data-next="010_Settings.html"></div>
+    <a href="https://example.com/not-a-manual.html">외부 링크</a>
+    <a href="../English/007_Calling.html">다른 언어</a>
+    """
+
+    assert _extract_official_manual_links(html, f"{root}index.html", root) == (
+        f"{root}007_Calling_btconnect.html",
+        f"{root}006_Navigation.html",
+        f"{root}010_Settings.html",
+    )

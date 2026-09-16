@@ -49,5 +49,7 @@ export async function restoreSession(): Promise<CurrentUser> {
     method: "POST",
   });
   setAccessToken(response.access_token);
-  return response.user;
+  // 앱 진입 시 JWT 발급 결과만 신뢰하지 않고, 현재 사용자 정보를 다시 조회한다.
+  // 역할이 바뀌었거나 온보딩이 완료된 뒤에도 헤더와 진입 화면을 최신 상태로 맞춘다.
+  return apiFetch<CurrentUser>("/auth/me");
 }

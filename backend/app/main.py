@@ -25,8 +25,12 @@ tags_metadata = [
         "description": "선택 차량 매뉴얼 기반의 비영구 단기 상담 API입니다.",
     },
     {
-        "name": "admin",
-        "description": "관리자 전용 차량 카탈로그와 매뉴얼 적재 운영 API입니다.",
+        "name": "admin-vehicle-catalog",
+        "description": "관리자 전용 차량 카탈로그와 공식 소스 운영 API입니다.",
+    },
+    {
+        "name": "admin-manuals",
+        "description": "관리자 전용 PDF 매뉴얼 업로드와 RAG 인덱싱 운영 API입니다.",
     },
 ]
 

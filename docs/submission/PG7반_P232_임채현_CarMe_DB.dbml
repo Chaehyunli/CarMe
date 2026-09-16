@@ -1,0 +1,175 @@
+Enum user_role {
+  USER
+  ADMIN
+}
+
+Enum user_status {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+Enum catalog_status {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+Enum manual_status {
+  DRAFT
+  UPLOADED
+  INDEXING
+  READY
+  FAILED
+  ARCHIVED
+}
+
+Table users {
+  id uuid [pk]
+  kakao_subject varchar(255) [not null, unique]
+  display_name varchar(100) [not null]
+  role user_role [not null, default: 'USER']
+  status user_status [not null, default: 'ACTIVE']
+  onboarding_completed boolean [not null, default: false]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  deleted_at timestamptz
+}
+
+Table refresh_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  token_hash varchar(255) [not null, unique]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+
+  Indexes {
+    user_id
+  }
+}
+
+Table vehicle_catalogs {
+  id uuid [pk]
+  manufacturer varchar(100) [not null]
+  model_name varchar(100) [not null]
+  model_year int [not null]
+  display_name varchar(220) [not null]
+  official_manual_url varchar(2048) [note: '관리자가 검증한 현대 공식 웹 매뉴얼 이동 URL, RAG 수집 근거가 아님']
+  status catalog_status [not null, default: 'DRAFT']
+  created_by uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+
+  Indexes {
+    (manufacturer, model_name, model_year) [unique]
+    (status, manufacturer, model_name, model_year)
+  }
+}
+
+Table vehicles {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  catalog_id uuid [not null, ref: > vehicle_catalogs.id]
+  nickname varchar(40) [not null]
+  created_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  deleted_at timestamptz
+
+  Note: 'PostgreSQL partial unique index: deleted_at IS NULL인 행에서 user_id, catalog_id 조합은 하나만 허용'
+
+  Indexes {
+    user_id
+  }
+}
+
+Table manuals {
+  id uuid [pk]
+  title varchar(255) [not null]
+  manual_type varchar(100) [not null]
+  locale varchar(20) [not null]
+  source_url varchar(2048)
+  object_key varchar(1024) [not null, note: 'private object storage key, UI와 일반 API에 미노출']
+  original_filename varchar(255) [not null]
+  sha256 varchar(64) [not null, unique]
+  file_size_bytes bigint [not null]
+  pdf_page_count int [not null]
+  status manual_status [not null, default: 'DRAFT']
+  ingestion_error text
+  embedding_model_version varchar(255)
+  indexing_total_chunks int [not null, default: 0]
+  embedded_chunk_count int [not null, default: 0]
+  created_by uuid [not null, ref: > users.id]
+  uploaded_at timestamptz
+  indexed_at timestamptz
+
+  Indexes {
+    (status, manual_type, locale)
+  }
+}
+
+Table manual_applicabilities {
+  manual_id uuid [not null, ref: > manuals.id]
+  catalog_id uuid [not null, ref: > vehicle_catalogs.id]
+  is_primary boolean [not null, default: false]
+  sort_order int [not null, default: 0]
+
+  Note: 'PostgreSQL partial unique index: is_primary IS TRUE인 행은 catalog_id당 하나만 허용'
+
+  Indexes {
+    (manual_id, catalog_id) [pk]
+  }
+}
+
+Table manual_sections {
+  id uuid [pk]
+  manual_id uuid [not null, ref: > manuals.id]
+  parent_section_id uuid [ref: > manual_sections.id]
+  title varchar(500) [not null]
+  toc_order int [not null]
+  pdf_page_start int [not null]
+  pdf_page_end int [not null]
+  retrieval_text text [not null]
+  embedding vector(2560)
+  embedding_model_version varchar(255)
+
+  Note: 'CHECK: pdf_page_start <= pdf_page_end'
+
+  Indexes {
+    (manual_id, toc_order) [unique]
+    (manual_id, pdf_page_start, pdf_page_end)
+  }
+}
+
+Table manual_chunks {
+  id uuid [pk]
+  manual_id uuid [not null, ref: > manuals.id]
+  section_id uuid [not null, ref: > manual_sections.id]
+  chunk_order int [not null]
+  pdf_page_number int [not null]
+  printed_page_number varchar(50)
+  content text [not null]
+  embedding vector(2560)
+  embedding_model_version varchar(255)
+
+  Indexes {
+    (manual_id, section_id, pdf_page_number, chunk_order)
+  }
+}
+
+Table official_sources {
+  id uuid [pk]
+  catalog_id uuid [not null, ref: > vehicle_catalogs.id]
+  source_type varchar(50) [not null]
+  system_variant varchar(100)
+  title varchar(500) [not null]
+  source_url varchar(2048) [not null]
+  content text [not null]
+  content_sha256 varchar(64) [not null]
+  status varchar(30) [not null, default: 'READY']
+  discovered_at timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  synced_at timestamptz [not null]
+  ingestion_error text
+
+  Indexes {
+    (catalog_id, source_url) [unique]
+    (catalog_id, source_type, status)
+  }
+}

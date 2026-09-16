@@ -31,6 +31,7 @@ interface Manual {
   indexing_total_chunks: number;
   embedded_chunk_count: number;
 }
+interface OfficialSource { id: string; }
 
 const router = useRouter();
 const user = ref<CurrentUser | null>(null);
@@ -54,6 +55,8 @@ let progressTimer: ReturnType<typeof window.setInterval> | null = null;
 const savingEdit = ref(false);
 const selectedFile = ref<File | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const officialSourceCounts = ref<Record<string, number>>({});
+const syncingOfficialCatalogId = ref<string | null>(null);
 const selectedCatalogs = computed(() => catalogs.value.filter((catalog) => manualForm.value.catalog_ids.includes(catalog.id)));
 const accountLabel = computed(() => {
   if (!user.value) return "사용자";
@@ -88,6 +91,16 @@ async function loadData(): Promise<void> {
   ]);
   catalogs.value = catalogResponse;
   manuals.value = manualResponse;
+  const counts = await Promise.all(catalogResponse.map(async (catalog) => {
+    if (!catalog.official_manual_url) return [catalog.id, 0] as const;
+    try {
+      const sources = await apiFetch<OfficialSource[]>(`/admin/vehicle-catalog/${catalog.id}/official-sources`);
+      return [catalog.id, sources.length] as const;
+    } catch {
+      return [catalog.id, 0] as const;
+    }
+  }));
+  officialSourceCounts.value = Object.fromEntries(counts);
 }
 
 async function createCatalog(): Promise<void> {
@@ -302,7 +315,7 @@ async function rebuildRagIndex(manual: Manual): Promise<void> {
 
 async function updateOfficialManualUrl(catalog: Catalog): Promise<void> {
   const value = window.prompt(
-    "현대 공식 웹 매뉴얼의 차량 시작 URL을 붙여 넣으세요. 이 링크는 PDF에 없는 인포테인먼트 기능 안내에만 사용하며 자동 수집하지 않습니다.",
+    "현대 공식 웹 매뉴얼의 차량 시작 URL을 붙여 넣으세요. 저장 후 '공식 안내 갱신'을 누르면 해당 차량에 허용된 공식 웹 매뉴얼의 하위 절차를 수집합니다.",
     catalog.official_manual_url || "",
   );
   if (value === null) return;
@@ -317,6 +330,24 @@ async function updateOfficialManualUrl(catalog: Catalog): Promise<void> {
     notice.value = value.trim() ? `${catalog.display_name}의 현대 공식 웹 매뉴얼 링크를 저장했습니다.` : "공식 웹 매뉴얼 링크를 지웠습니다.";
   } catch (caught) {
     error.value = caught instanceof Error ? caught.message : "공식 웹 매뉴얼 링크를 저장하지 못했습니다.";
+  }
+}
+
+async function syncOfficialSources(catalog: Catalog): Promise<void> {
+  error.value = "";
+  notice.value = "";
+  syncingOfficialCatalogId.value = catalog.id;
+  try {
+    const result = await apiFetch<{ synced_count: number }>(
+      `/admin/vehicle-catalog/${catalog.id}/official-sources/sync`,
+      { method: "POST" },
+    );
+    officialSourceCounts.value = { ...officialSourceCounts.value, [catalog.id]: result.synced_count };
+    notice.value = `${catalog.display_name}의 공식 보조 안내를 갱신했습니다. ${result.synced_count}건을 준비했습니다.`;
+  } catch (caught) {
+    error.value = caught instanceof Error ? caught.message : "공식 보조 안내를 갱신하지 못했습니다.";
+  } finally {
+    syncingOfficialCatalogId.value = null;
   }
 }
 
@@ -348,7 +379,7 @@ function formatSize(bytes: number): string {
       <section id="vehicles" class="work-section" aria-labelledby="vehicles-title">
         <div class="section-heading"><div><p class="section-label">01 · 차량 카탈로그</p><h2 id="vehicles-title">차량과 연식 등록</h2></div><span>{{ catalogs.length }}개 차량</span></div>
         <form class="catalog-form" @submit.prevent="createCatalog"><VehicleCatalogFields mode="entry" v-model:manufacturer="catalogForm.manufacturer" v-model:model-name="catalogForm.model_name" v-model:model-year="catalogForm.model_year" /><button class="button primary" :disabled="savingCatalog" type="submit">{{ savingCatalog ? "등록 중" : "차량 초안 추가" }}</button></form>
-        <div class="catalog-list"><div v-if="loading" class="empty-state">등록된 차량을 불러오는 중입니다.</div><div v-else-if="!catalogs.length" class="empty-state">먼저 차량과 연식을 등록해 주세요.</div><article v-for="catalog in catalogs" :key="catalog.id" class="catalog-row"><div v-if="editingCatalogId === catalog.id" class="inline-editor"><label class="field"><span>제조사</span><input v-model="catalogEdit.manufacturer" /></label><label class="field"><span>차종</span><input v-model="catalogEdit.model_name" /></label><label class="field"><span>연식</span><input v-model.number="catalogEdit.model_year" min="1980" max="2100" type="number" /></label></div><div v-else><strong>{{ catalog.display_name }}</strong><span>{{ catalog.manufacturer }} · {{ catalog.model_year }}년형{{ catalog.official_manual_url ? " · 공식 웹 매뉴얼 링크 등록됨" : "" }}</span></div><div class="catalog-meta"><span class="status-tag" :class="catalog.status.toLowerCase()">{{ catalog.status }}</span><span>준비된 매뉴얼 {{ catalog.ready_manual_count }}</span><a v-if="catalog.official_manual_url" class="test-button" :href="catalog.official_manual_url" target="_blank" rel="noreferrer">공식 페이지 열기</a><button class="test-button" type="button" @click="updateOfficialManualUrl(catalog)">공식 링크 {{ catalog.official_manual_url ? "수정" : "등록" }}</button><div v-if="catalog.status === 'DRAFT'" class="row-actions"><template v-if="editingCatalogId === catalog.id"><button type="button" @click="saveCatalogEdit">저장</button><button type="button" @click="editingCatalogId = null">취소</button></template><template v-else><button type="button" @click="beginCatalogEdit(catalog)">수정</button><button class="danger" type="button" @click="deleteCatalog(catalog)">삭제</button></template></div></div></article></div>
+        <div class="catalog-list"><div v-if="loading" class="empty-state">등록된 차량을 불러오는 중입니다.</div><div v-else-if="!catalogs.length" class="empty-state">먼저 차량과 연식을 등록해 주세요.</div><article v-for="catalog in catalogs" :key="catalog.id" class="catalog-row"><div v-if="editingCatalogId === catalog.id" class="inline-editor"><label class="field"><span>제조사</span><input v-model="catalogEdit.manufacturer" /></label><label class="field"><span>차종</span><input v-model="catalogEdit.model_name" /></label><label class="field"><span>연식</span><input v-model.number="catalogEdit.model_year" min="1980" max="2100" type="number" /></label></div><div v-else><strong>{{ catalog.display_name }}</strong><span>{{ catalog.manufacturer }} · {{ catalog.model_year }}년형{{ catalog.official_manual_url ? " · 공식 웹 매뉴얼 링크 등록됨" : "" }}</span></div><div class="catalog-meta"><span class="status-tag" :class="catalog.status.toLowerCase()">{{ catalog.status }}</span><span>준비된 매뉴얼 {{ catalog.ready_manual_count }}</span><template v-if="catalog.official_manual_url"><span>공식 보조 안내 {{ officialSourceCounts[catalog.id] ?? 0 }}건</span><a class="test-button" :href="catalog.official_manual_url" target="_blank" rel="noreferrer">공식 페이지 열기</a><button class="test-button" :disabled="syncingOfficialCatalogId === catalog.id" type="button" @click="syncOfficialSources(catalog)">{{ syncingOfficialCatalogId === catalog.id ? "갱신 중" : "공식 안내 갱신" }}</button></template><button class="test-button" type="button" @click="updateOfficialManualUrl(catalog)">공식 링크 {{ catalog.official_manual_url ? "수정" : "등록" }}</button><div v-if="catalog.status === 'DRAFT'" class="row-actions"><template v-if="editingCatalogId === catalog.id"><button type="button" @click="saveCatalogEdit">저장</button><button type="button" @click="editingCatalogId = null">취소</button></template><template v-else><button type="button" @click="beginCatalogEdit(catalog)">수정</button><button class="danger" type="button" @click="deleteCatalog(catalog)">삭제</button></template></div></div></article></div>
       </section>
       <section id="manuals" class="work-section" aria-labelledby="manuals-title">
         <div class="section-heading"><div><p class="section-label">02 · 공식 매뉴얼</p><h2 id="manuals-title">PDF 매뉴얼 업로드</h2></div><span>PDF만 가능 · 최대 200 MB</span></div>

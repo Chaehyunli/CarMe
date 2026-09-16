@@ -153,19 +153,15 @@ async def send_message(session_id: UUID, payload: ChatMessageCreate, current_use
     manuals = resolve_manuals(db, vehicle)
     guardrail = CarMeRagGuardrailMiddleware()
     analysis = await guardrail.before_agent(question, state.history)
-    hits = guardrail.wrap_tool_call(db, [manual.id for manual, _ in manuals], analysis)
-    decision = guardrail.evidence_gate(analysis, hits)
+    # Retrieve both scoped corpora before making an evidence decision.  A
+    # broad safety paragraph in the owner PDF must not prevent a directly
+    # matching, heading-level infotainment procedure from being considered.
+    manual_hits = guardrail.wrap_tool_call(db, [manual.id for manual, _ in manuals], analysis)
     official_sources = resolve_official_sources(db, vehicle)
-    # The owner PDF stays authoritative for vehicle operation. Official web
-    # manuals are a fallback for infotainment details that the PDF delegates.
-    if official_sources and (
-        decision.result_status == "INSUFFICIENT_EVIDENCE"
-        or (decision.result_status == "CLARIFYING" and analysis.intent != "symptom")
-    ):
-        official_hits = guardrail.rank_chunks(official_sources, analysis)[: get_settings().rag_max_context_chunks]
-        official_decision = guardrail.evidence_gate(analysis, official_hits)
-        if official_decision.result_status != "INSUFFICIENT_EVIDENCE":
-            decision = official_decision
+    candidates = [hit.chunk for hit in manual_hits]
+    candidates.extend(official_sources)
+    hits = guardrail.rank_chunks(candidates, analysis)[: get_settings().rag_max_context_chunks]
+    decision = guardrail.evidence_gate(analysis, hits)
     if decision.result_status == "INSUFFICIENT_EVIDENCE":
         catalog = db.get(VehicleCatalog, vehicle.catalog_id)
         if catalog is not None and catalog.official_manual_url and _needs_web_manual_link(analysis):
