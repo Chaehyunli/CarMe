@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from botocore.exceptions import ClientError
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -28,12 +28,13 @@ from app.schemas.admin import (
     ManualIndexResponse,
     ManualResponse,
     ManualUpdateRequest,
+    OfficialManualUrlUpdate,
     OfficialSourceResponse,
     OfficialSourceSyncResponse,
     UploadCompleteResponse,
     UploadUrlResponse,
 )
-from app.services.manual_ingestion import index_manual_for_local_test
+from app.services.manual_ingestion import embed_manual_in_background, prepare_manual_for_indexing
 from app.services.official_source_sync import (
     OfficialSourceSyncError,
     resolve_official_sources,
@@ -51,6 +52,7 @@ def catalog_response(catalog: VehicleCatalog, ready_manual_count: int = 0) -> Ad
         model_name=catalog.model_name,
         model_year=catalog.model_year,
         display_name=catalog.display_name,
+        official_manual_url=catalog.official_manual_url,
         status=catalog.status,
         ready_manual_count=ready_manual_count,
         created_at=catalog.created_at,
@@ -91,6 +93,7 @@ def create_admin_catalog(
         model_name=model_name,
         model_year=payload.model_year,
         display_name=f"{model_name} {payload.model_year}",
+        official_manual_url=str(payload.official_manual_url) if payload.official_manual_url else None,
         status=CatalogStatus.DRAFT,
         created_by=current_user.id,
     )
@@ -126,6 +129,7 @@ def update_admin_catalog(
     catalog.model_name = payload.model_name.strip()
     catalog.model_year = payload.model_year
     catalog.display_name = f"{catalog.model_name} {catalog.model_year}"
+    catalog.official_manual_url = str(payload.official_manual_url) if payload.official_manual_url else None
     try:
         db.commit()
     except IntegrityError as exc:
@@ -134,6 +138,28 @@ def update_admin_catalog(
             status_code=status.HTTP_409_CONFLICT,
             detail={"code": "DUPLICATE_VEHICLE", "message": "이미 등록된 차량과 연식입니다."},
         ) from exc
+    db.refresh(catalog)
+    return catalog_response(catalog)
+
+
+@router.patch("/vehicle-catalog/{catalog_id}/official-manual-url", response_model=AdminVehicleCatalogResponse)
+def update_catalog_official_manual_url(
+    catalog_id: UUID,
+    payload: OfficialManualUrlUpdate,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> AdminVehicleCatalogResponse:
+    """Save an admin-verified Hyundai manual root URL for any live catalog.
+
+    This is navigation metadata, not a request to scrape protected web pages.
+    It deliberately remains editable after the representative PDF activates a
+    catalog because Hyundai may change a web-manual route independently.
+    """
+    catalog = db.get(VehicleCatalog, catalog_id)
+    if catalog is None or catalog.status == CatalogStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="차량을 찾을 수 없습니다.")
+    catalog.official_manual_url = str(payload.official_manual_url) if payload.official_manual_url else None
+    db.commit()
     db.refresh(catalog)
     return catalog_response(catalog)
 
@@ -406,6 +432,7 @@ def complete_manual_upload(
 @router.post("/manuals/{manual_id}/prepare-rag-test", response_model=ManualIndexResponse)
 def prepare_manual_rag_test(
     manual_id: UUID,
+    background_tasks: BackgroundTasks,
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> ManualIndexResponse:
@@ -414,12 +441,40 @@ def prepare_manual_rag_test(
     if manual is None or manual.status == ManualStatus.ARCHIVED:
         raise HTTPException(status_code=404, detail="매뉴얼을 찾을 수 없습니다.")
     try:
-        page_count = index_manual_for_local_test(db, manual)
+        page_count, chunk_count = prepare_manual_for_indexing(db, manual)
     except (ClientError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail="문서 테스트 준비 중 오류가 발생했습니다.") from exc
-    return ManualIndexResponse(id=manual_id, status=ManualStatus.READY, indexed_page_count=page_count)
+    background_tasks.add_task(embed_manual_in_background, manual_id)
+    return ManualIndexResponse(
+        id=manual_id, status=ManualStatus.INDEXING, indexed_page_count=page_count,
+        indexing_total_chunks=chunk_count, embedded_chunk_count=0,
+    )
+
+
+@router.post("/manuals/{manual_id}/rebuild-rag-index", response_model=ManualIndexResponse)
+def rebuild_manual_rag_index(
+    manual_id: UUID,
+    background_tasks: BackgroundTasks,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> ManualIndexResponse:
+    """Re-extract and re-embed an existing READY PDF after RAG changes."""
+    manual = db.get(Manual, manual_id)
+    if manual is None or manual.status == ManualStatus.ARCHIVED:
+        raise HTTPException(status_code=404, detail="매뉴얼을 찾을 수 없습니다.")
+    try:
+        page_count, chunk_count = prepare_manual_for_indexing(db, manual, force=True)
+    except (ClientError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="임베딩 재생성 중 오류가 발생했습니다.") from exc
+    background_tasks.add_task(embed_manual_in_background, manual_id)
+    return ManualIndexResponse(
+        id=manual_id, status=ManualStatus.INDEXING, indexed_page_count=page_count,
+        indexing_total_chunks=chunk_count, embedded_chunk_count=0,
+    )
 
 
 def manual_response(
@@ -439,6 +494,8 @@ def manual_response(
         applicable_catalogs=[catalog.display_name for catalog in catalogs],
         uploaded_at=manual.uploaded_at,
         ingestion_error=manual.ingestion_error,
+        indexing_total_chunks=manual.indexing_total_chunks,
+        embedded_chunk_count=manual.embedded_chunk_count,
     )
 
 

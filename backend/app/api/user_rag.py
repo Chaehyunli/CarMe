@@ -167,6 +167,18 @@ async def send_message(session_id: UUID, payload: ChatMessageCreate, current_use
         if official_decision.result_status != "INSUFFICIENT_EVIDENCE":
             decision = official_decision
     if decision.result_status == "INSUFFICIENT_EVIDENCE":
+        catalog = db.get(VehicleCatalog, vehicle.catalog_id)
+        if catalog is not None and catalog.official_manual_url and _needs_web_manual_link(analysis):
+            return ChatMessageResponse(
+                result_status="INSUFFICIENT_EVIDENCE",
+                answer=(
+                    "현재 연결된 취급설명서에서는 요청하신 세부 절차를 확인하지 못했습니다. "
+                    "내비게이션·인포테인먼트 기능은 현대 공식 웹 매뉴얼에서 확인해 주세요."
+                ),
+                official_manual_url=catalog.official_manual_url,
+                official_manual_label="현대 공식 웹 매뉴얼 열기",
+                expires_at=state.last_used_at + timedelta(minutes=get_settings().chat_session_idle_ttl_minutes),
+            )
         return ChatMessageResponse(
             result_status="INSUFFICIENT_EVIDENCE",
             answer=insufficient_evidence_answer(),
@@ -206,6 +218,11 @@ async def send_message(session_id: UUID, payload: ChatMessageCreate, current_use
 @chat_router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 def close_chat(session_id: UUID, current_user=Depends(get_current_user)):
     delete_session(session_id, current_user.id)
+
+
+def _needs_web_manual_link(analysis) -> bool:
+    """Only delegate web-only infotainment domains after PDF evidence fails."""
+    return analysis.topic is not None and analysis.topic.key in {"navigation", "bluetooth"}
 
 
 def citation_response(chunk, manual_titles: dict[UUID, str]) -> CitationResponse:

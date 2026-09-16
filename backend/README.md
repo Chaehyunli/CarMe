@@ -86,6 +86,19 @@ docker compose exec ollama ollama list
 
 모델/임베딩 선택 및 Elasticsearch 도입 기준은 [인프라·검색·로컬 AI 선정](../docs/인프라_및_로컬AI_선정.md)을 따른다.
 
+## PDF 임베딩 CLI
+
+관리자 화면의 `RAG 테스트 준비`도 같은 작업을 실행한다. 긴 PDF는 아래 CLI로 터미널에서 진행률을 보며 실행할 수 있다.
+
+```bash
+cd backend
+source .venv/bin/activate
+python scripts/embed_manuals.py --status
+python scripts/embed_manuals.py --all --rebuild
+```
+
+각 배치가 끝날 때 `문서명: 32/567 청크 (5.6%)`처럼 출력된다. 중단된 `INDEXING` 작업은 `python scripts/embed_manuals.py --resume`으로 이어서 실행한다. PostgreSQL·MinIO·Ollama가 먼저 실행되어 있어야 한다.
+
 ## 검사
 
 ```bash

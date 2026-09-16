@@ -35,13 +35,20 @@ class Settings(BaseSettings):
     ollama_chat_model: str = "qwen3:8b"
     ollama_embedding_model: str = "qwen3-embedding:4b"
     embedding_model_name: str = "qwen3-embedding:4b"
-    embedding_dimensions: int = 1024
+    # qwen3-embedding:4b returns 2,560-dimensional vectors through Ollama.
+    # Keep this aligned with the pgvector column type; a mismatch must fail
+    # during indexing rather than silently creating an unusable RAG index.
+    embedding_dimensions: int = 2560
+    embedding_batch_size: int = 32
+    embedding_timeout_seconds: float = 240.0
     chat_session_idle_ttl_minutes: int = 30
     rag_minimum_evidence_score: float = 9.0
     rag_minimum_topic_coverage: float = 0.5
     rag_minimum_score_gap: float = 0.75
     rag_minimum_diagnostic_signals: int = 1
     rag_max_context_chunks: int = 4
+    rag_vector_candidates: int = 24
+    rag_semantic_score_weight: float = 3.0
     rag_intent_llm_enabled: bool = True
     rag_intent_model: str = ""
     rag_intent_timeout_seconds: float = 4.0

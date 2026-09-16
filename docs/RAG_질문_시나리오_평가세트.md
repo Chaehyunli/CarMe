@@ -45,3 +45,23 @@
 - 모델이 중단되거나 3초 내 응답하지 않으면 규칙 폴백으로 같은 검색을 수행한다. LLM 불가가 사용자의 질문 자체를 거절하는 이유가 되면 안 된다.
 - PDF에 정확한 절차가 없고 인접한 사실만 있으면 `CLARIFYING`으로 전환한다. 예: 내비게이션 연동 화면 설명은 시스템 초기화 절차의 근거가 아니다.
 - `GROUNDED`의 citation page precision은 100%여야 한다. 질문과 문단의 단어 일부만 겹친 경우는 실패로 기록한다.
+
+## pytest 단계별 회귀 실행
+
+`backend/tests/test_rag_stage_regression.py`는 위 30개 질문을 하나씩 실행하며 다음을 모두 검증한다.
+
+1. `before_agent` 폴백의 질문 정규화, 의도, 주제, in-memory 문맥 사용 여부
+2. Retriever/재정렬의 최상위 후보 페이지
+3. Evidence Gate의 최종 상태와 Answer Agent에 전달 가능한 citation 페이지
+
+```bash
+cd backend
+source .venv/bin/activate
+pytest -q tests/test_rag_stage_regression.py
+```
+
+실제 업로드한 PDF까지 검증할 때는 DB 회귀를 추가한다. 현재는 화면에서 확인된 쏘나타 택시 2025의 `내비게이션 초기화` 오탐(PDF 261)을 고정했다. 이 테스트는 해당 로컬 데이터가 있는 환경에서만 실행한다.
+
+```bash
+CARME_RUN_DB_REGRESSION=1 pytest -q -m database_regression
+```

@@ -31,6 +31,9 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+  "database_regression: uses a locally ingested manual and is opt-in",
+]
 
 [tool.ruff]
 line-length = 100

@@ -10,12 +10,18 @@ class AdminVehicleCatalogCreate(BaseModel):
     manufacturer: str = Field(default="HYUNDAI", min_length=1, max_length=100)
     model_name: str = Field(min_length=1, max_length=100)
     model_year: int = Field(ge=1980, le=2100)
+    official_manual_url: HttpUrl | None = None
 
 
 class AdminVehicleCatalogUpdate(BaseModel):
     manufacturer: str = Field(default="HYUNDAI", min_length=1, max_length=100)
     model_name: str = Field(min_length=1, max_length=100)
     model_year: int = Field(ge=1980, le=2100)
+    official_manual_url: HttpUrl | None = None
+
+
+class OfficialManualUrlUpdate(BaseModel):
+    official_manual_url: HttpUrl | None = None
 
 
 class AdminVehicleCatalogResponse(BaseModel):
@@ -24,6 +30,7 @@ class AdminVehicleCatalogResponse(BaseModel):
     model_name: str
     model_year: int
     display_name: str
+    official_manual_url: str | None = None
     status: CatalogStatus
     ready_manual_count: int = 0
     created_at: datetime
@@ -64,6 +71,8 @@ class ManualResponse(BaseModel):
     created_at: datetime | None = None
     uploaded_at: datetime | None = None
     ingestion_error: str | None = None
+    indexing_total_chunks: int = 0
+    embedded_chunk_count: int = 0
 
 
 class UploadUrlResponse(BaseModel):
@@ -82,6 +91,8 @@ class ManualIndexResponse(BaseModel):
     id: UUID
     status: ManualStatus
     indexed_page_count: int
+    indexing_total_chunks: int = 0
+    embedded_chunk_count: int = 0
 
 
 class OfficialSourceResponse(BaseModel):

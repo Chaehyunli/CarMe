@@ -81,6 +81,10 @@ class VehicleCatalog(Base):
     model_name: Mapped[str] = mapped_column(sa.String(100), nullable=False)
     model_year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     display_name: Mapped[str] = mapped_column(sa.String(220), nullable=False)
+    # A human-verified Hyundai Owners Manual page. It is a navigation link,
+    # not scraped RAG evidence, because several infotainment manuals are web
+    # only and protected from automated collection.
+    official_manual_url: Mapped[str | None] = mapped_column(sa.String(2048))
     status: Mapped[CatalogStatus] = mapped_column(
         sa.Enum(CatalogStatus, name="catalog_status"),
         nullable=False,
@@ -144,6 +148,8 @@ class Manual(Base):
     )
     ingestion_error: Mapped[str | None] = mapped_column(sa.Text)
     embedding_model_version: Mapped[str | None] = mapped_column(sa.String(255))
+    indexing_total_chunks: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default="0")
+    embedded_chunk_count: Mapped[int] = mapped_column(sa.Integer, nullable=False, server_default="0")
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False
     )
@@ -192,7 +198,7 @@ class ManualSection(Base):
     pdf_page_start: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     pdf_page_end: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     retrieval_text: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(1024))
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(2560))
     embedding_model_version: Mapped[str | None] = mapped_column(sa.String(255))
 
 
@@ -219,7 +225,7 @@ class ManualChunk(Base):
     pdf_page_number: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     printed_page_number: Mapped[str | None] = mapped_column(sa.String(50))
     content: Mapped[str] = mapped_column(sa.Text, nullable=False)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(1024))
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(2560))
     embedding_model_version: Mapped[str | None] = mapped_column(sa.String(255))
 
 

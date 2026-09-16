@@ -102,7 +102,7 @@ ChatModelPort.generate(messages, schema) -> structured answer
 - `manual_section`: 문서명, 제목, breadcrumb, 페이지 범위, 요약으로 임베딩한다.
 - `manual_chunk`: 문서명, breadcrumb, PDF 페이지, 원문으로 임베딩한다.
 - LLM에는 인덱싱용 설명문이 아닌 원문, breadcrumb, 페이지, 내부 chunk ID만 전달한다.
-- 초기 임베딩은 Ollama `qwen3-embedding:4b`, 1,024차원으로 고정한다. 모델·차원을 바꾸면 버전별 벡터를 섞지 않고 재색인한다. 초기 pgvector 검색은 exact nearest-neighbor이며, 데이터·지연시간 평가 후 HNSW를 도입한다.
+- Ollama `qwen3-embedding:4b`의 실제 `/api/embed` 출력은 **2,560차원**이다. `manual_chunk.embedding`은 이 차원으로 검증 후 저장하며, 모델·차원을 바꾸면 벡터를 섞지 않고 재색인한다. pgvector 일반 HNSW의 2,000차원 제한 때문에 `halfvec(2560)` cosine HNSW 표현식 인덱스를 사용한다.
 - 초기 생성 모델은 Ollama `qwen3:8b`다. 일반 매뉴얼 답변은 non-thinking의 짧은 구조화 출력으로 평가하고, provider/model 교체는 adapter 설정으로만 한다.
 
 LangChain은 자율 Agent가 아니라 고정된 LCEL `Runnable` 체인이다. `RunnableWithMessageHistory`와 `InMemoryChatMessageHistory`를 세션 ID별 RAM 저장소에 연결한다.

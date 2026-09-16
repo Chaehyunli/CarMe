@@ -58,6 +58,10 @@ class ChatMessageResponse(BaseModel):
     citations: list[CitationResponse] = Field(default_factory=list)
     clarifying_question: str | None = None
     escalation: str | None = None
+    # Used only when a web-only Hyundai manual must be opened by the user;
+    # this is intentionally separate from a quoted RAG citation.
+    official_manual_url: str | None = None
+    official_manual_label: str | None = None
     expires_at: datetime
 
 
