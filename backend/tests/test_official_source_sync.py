@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from app.services.official_source_sync import (
     _declared_infotaiment_variants,
     _extract_official_manual_links,
@@ -9,6 +11,7 @@ from app.services.official_source_sync import (
     _is_catalog_source,
     _is_system_manual_source,
     _normalize_content,
+    _vehicle_infotaiment_sources,
 )
 
 
@@ -73,4 +76,37 @@ def test_ivi_manual_crawler_uses_static_menu_and_section_links_only() -> None:
         f"{root}007_Calling_btconnect.html",
         f"{root}006_Navigation.html",
         f"{root}010_Settings.html",
+    )
+
+
+@pytest.mark.asyncio
+async def test_vehicle_api_sources_keep_only_the_catalogs_korean_ivi_variants() -> None:
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "frontSeat": [
+                    {
+                        "platformCode": "ccNC",
+                        "manuals": [
+                            {"url": "https://ownersmanual.hyundai.com/ivi/ccNC/AVNT/KOR/Korean/index.html"},
+                            {"url": "https://ownersmanual.hyundai.com/ivi/ccNC/AVNT/USA/Korean/index.html"},
+                        ],
+                    }
+                ]
+            }
+
+    class Client:
+        async def get(self, *_args, **_kwargs):
+            return Response()
+
+    catalog = SimpleNamespace(
+        model_year=2025,
+        official_manual_url="https://ownersmanual.hyundai.com/manual/test?projCode=DN8c&year=2025&langCode=ko_KR&countryCode=A99",
+    )
+
+    assert await _vehicle_infotaiment_sources(Client(), catalog) == (
+        ("ccNC", "https://ownersmanual.hyundai.com/ivi/ccNC/AVNT/KOR/Korean/index.html"),
     )

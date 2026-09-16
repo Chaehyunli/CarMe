@@ -1,4 +1,4 @@
-"""Synchronize allow-listed Hyundai web-manual pages discovered through Tavily.
+"""Synchronize allow-listed Hyundai web-manual pages for one vehicle catalog.
 
 Tavily is a discovery transport only. The stored Hyundai page text and its
 canonical URL are the evidence later shown to the user.
@@ -170,41 +170,45 @@ async def sync_official_sources(
     db: Session, catalog: VehicleCatalog, settings: Settings | None = None
 ) -> list[OfficialSource]:
     settings = settings or get_settings()
-    if not settings.tavily_api_key:
-        raise OfficialSourceSyncError("TAVILY_API_KEY가 설정되지 않았습니다.")
-
-    # Tavily is discovery only.  Its result content is often a short synopsis
-    # of an accordion page, so it must not become the RAG evidence itself.
-    # Keep only trusted destination URLs here and fetch the Hyundai HTML below.
     fetched: dict[str, tuple[str, dict, str | None]] = {}
     async with httpx.AsyncClient(timeout=settings.official_source_sync_timeout_seconds) as client:
-        index_results = await _tavily_search(
-            client,
-            settings,
-            f"{catalog.model_name} {catalog.model_year} {_VEHICLE_INDEX_QUERY}",
-        )
-        for item in index_results:
-            url = str(item.get("url", ""))
-            if _is_catalog_source(url, "VEHICLE_MANUAL_INDEX", catalog):
-                fetched.setdefault(url, ("VEHICLE_MANUAL_INDEX", item, None))
+        # The Hyundai vehicle page exposes an official API for the exact
+        # infotainment variants attached to project code + model year.  This
+        # is more reliable than a web search, especially for commercial
+        # variants such as Sonata Taxi.
+        for variant, url in await _vehicle_infotaiment_sources(client, catalog):
+            fetched.setdefault(
+                url,
+                ("INFOTAINMENT_WEB_MANUAL", {"title": f"현대 {variant} 웹 매뉴얼"}, variant),
+            )
 
-        # The vehicle landing page is the entitlement boundary: only the
-        # infotainment variants named there may be supplemented.  A system
-        # detail page intentionally lacks the car name, so it is never added
-        # unless the exact vehicle page first listed that system.
-        variants = _declared_infotaiment_variants(
-            str(item.get("content", "")) for _, item, _ in fetched.values()
-        )
-        for variant in variants:
-            system_results = await _tavily_search(
+        # Tavily is a fallback discovery route for catalogs whose official
+        # vehicle API has no linked infotainment manual.  Its short result
+        # snippets never become RAG evidence; only fetched Hyundai HTML does.
+        if not fetched and settings.tavily_api_key:
+            index_results = await _tavily_search(
                 client,
                 settings,
-                f"{variant} 내비게이션 블루투스 설정 site:ownersmanual.hyundai.com/ivi/",
+                f"{catalog.model_name} {catalog.model_year} {_VEHICLE_INDEX_QUERY}",
             )
-            for item in system_results:
+            for item in index_results:
                 url = str(item.get("url", ""))
-                if _is_system_manual_source(url, variant):
-                    fetched.setdefault(url, ("INFOTAINMENT_WEB_MANUAL", item, variant))
+                if _is_catalog_source(url, "VEHICLE_MANUAL_INDEX", catalog):
+                    fetched.setdefault(url, ("VEHICLE_MANUAL_INDEX", item, None))
+
+            variants = _declared_infotaiment_variants(
+                str(item.get("content", "")) for _, item, _ in fetched.values()
+            )
+            for variant in variants:
+                system_results = await _tavily_search(
+                    client,
+                    settings,
+                    f"{variant} 내비게이션 블루투스 설정 site:ownersmanual.hyundai.com/ivi/",
+                )
+                for item in system_results:
+                    url = str(item.get("url", ""))
+                    if _is_system_manual_source(url, variant):
+                        fetched.setdefault(url, ("INFOTAINMENT_WEB_MANUAL", item, variant))
 
     if not fetched:
         raise OfficialSourceSyncError("동기화할 현대 공식 웹 매뉴얼 본문을 찾지 못했습니다.")
@@ -291,6 +295,46 @@ async def sync_official_sources(
 def _is_allowed_official_url(url: str) -> bool:
     parsed = urlparse(url)
     return parsed.scheme == "https" and parsed.hostname in _ALLOWED_HOSTS
+
+
+async def _vehicle_infotaiment_sources(
+    client: httpx.AsyncClient, catalog: VehicleCatalog
+) -> tuple[tuple[str, str], ...]:
+    """Read the exact IVI variants that Hyundai assigns to this catalog."""
+    if not catalog.official_manual_url or not _is_allowed_official_url(catalog.official_manual_url):
+        return ()
+    query = parse_qs(urlparse(catalog.official_manual_url).query)
+    project_code = query.get("projCode", [""])[0]
+    year = query.get("year", [str(catalog.model_year)])[0]
+    lang_code = query.get("langCode", ["ko_KR"])[0]
+    country_code = query.get("countryCode", ["A99"])[0]
+    if not project_code:
+        return ()
+    try:
+        response = await client.get(
+            "https://ownersmanual.hyundai.com/api/v3/hmc/model/avn-manuals",
+            params={
+                "projectCode": project_code,
+                "year": year,
+                "langCode": lang_code,
+                "countryCode": country_code,
+            },
+            headers={"Accept-Language": "ko-KR,ko;q=0.9", "User-Agent": "CarMe-RAG/1.0"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return ()
+    sources: list[tuple[str, str]] = []
+    for platform in payload.get("frontSeat", []) if isinstance(payload, dict) else []:
+        if not isinstance(platform, dict):
+            continue
+        variant = str(platform.get("platformCode", "")).strip()
+        for manual in platform.get("manuals", []):
+            url = str(manual.get("url", "")).strip() if isinstance(manual, dict) else ""
+            if variant and _is_system_manual_source(url, variant) and (variant, url) not in sources:
+                sources.append((variant, url))
+    return tuple(sources)
 
 
 def _is_catalog_source(url: str, source_type: str, catalog: VehicleCatalog) -> bool:

@@ -83,6 +83,3 @@ input:focus, select:focus { border-color: #285f4a; box-shadow: 0 0 0 3px rgba(40
 .citation-link { text-decoration: underline; text-decoration-color: #9abfac; text-underline-offset: 2px; }
 .citations button, .citation-link { background: transparent; border: 0; color: #405064; display: block; font-size: .72rem; line-height: 1.45; padding: 0; text-align: left; }
 .official-manual-link { color: #146746; font-size: .9rem; font-weight: 800; margin-top: .85rem; text-decoration-color: #146746; }
-
-/* PDF extraction keeps visual line breaks; chat messages should reflow as prose. */
-.message p { white-space: normal; }

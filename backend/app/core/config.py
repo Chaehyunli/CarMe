@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 2560
     embedding_batch_size: int = 32
     embedding_timeout_seconds: float = 240.0
+    chat_answer_timeout_seconds: float = 25.0
     chat_session_idle_ttl_minutes: int = 30
     rag_minimum_evidence_score: float = 9.0
     rag_minimum_topic_coverage: float = 0.5
