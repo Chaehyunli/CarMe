@@ -23,12 +23,12 @@
 | 7 | `POST /auth/logout` | `SCR-AUTH-001` | 상단 로그아웃 버튼에서 세션을 종료하고 로그인 화면으로 이동한다. |
 | 8 | `GET /vehicle-catalog` | `SCR-VEHICLE-001` | 질문 가능한 차량의 제조사, 차종, 연식 드롭다운을 채운다. |
 | 9 | `GET /vehicles` | `SCR-VEHICLE-001` | 현재 계정에 이미 선택된 차량을 확인해 중복 등록을 막는다. |
-| 10 | `POST /vehicles` | `SCR-VEHICLE-002` | 선택 차량으로 처음 질문을 시작할 때 계정의 선택 차량을 만든다. |
+| 10 | `POST /vehicles` | `SCR-VEHICLE-001` | `매뉴얼로 질문하기` 선택 시 선택 차량을 계정에 처음 연결하거나 기존 연결을 재사용한다. |
 | 11 | `POST /chat-sessions` | `SCR-CHAT-001` | 선택 차량으로 비영구 채팅 세션을 연다. |
 | 12 | `GET /chat-sessions/{session_id}/manuals` | `SCR-CHAT-001` | 세션 생성 직후 현재 READY 연결 매뉴얼을 갱신해 PDF 목록에 표시한다. |
 | 13 | `POST /chat-sessions/{session_id}/manuals/{manual_id}/download-url` | `SCR-CHAT-002` | PDF 열기 클릭 시 짧은 만료 다운로드 URL을 발급한다. |
-| 14 | `POST /chat-sessions/{session_id}/messages` | `SCR-CHAT-002`, `SCR-CHAT-003`, `SCR-CHAT-004`, `SCR-CHAT-005` | 질문을 전송하고 근거 답변, 보완 질문, 근거 부족, 안전 안내 상태를 표시한다. |
-| 15 | `DELETE /chat-sessions/{session_id}` | `SCR-CHAT-006` | 차량 다시 선택, 로그아웃, 화면 이탈 시 단기 기억을 삭제한다. |
+| 14 | `POST /chat-sessions/{session_id}/messages` | `SCR-CHAT-002` | 질문을 전송하고 같은 채팅 레이아웃에서 근거 답변, 보완 질문, 근거 부족, 안전 안내 상태를 표시한다. |
+| 15 | `DELETE /chat-sessions/{session_id}` | `SCR-CHAT-003` | 차량 다시 선택, 로그아웃, 화면 이탈 시 단기 기억을 삭제한다. |
 | 16 | `GET /admin/vehicle-catalog` | `SCR-ADMIN-001` | 관리자 카탈로그 목록과 READY 매뉴얼 수를 표시한다. |
 | 17 | `POST /admin/vehicle-catalog` | `SCR-ADMIN-001` | 제조사, 차종, 연식으로 차량 초안을 만든다. |
 | 18 | `PATCH /admin/vehicle-catalog/{catalog_id}` | `SCR-ADMIN-001` | 초안 차량의 제조사, 차종, 연식을 수정한다. |

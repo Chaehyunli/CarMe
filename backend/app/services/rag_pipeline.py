@@ -230,8 +230,6 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
             # how to change it.  Owner PDFs describe the actual control with
             # the wiper switch, speed knob, and HI/LO/INT labels.
             retrieval_query = f"{retrieval_query} {_WIPER_SPEED_EXPANSION}"
-        if intent == "vehicle_options":
-            retrieval_query = f"{retrieval_query} 선택 사양 미장착 사양표시 트림"
         return QueryAnalysis(
             question=question,
             normalized_question=normalized,
@@ -456,6 +454,13 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
     def evidence_gate(self, analysis: QueryAnalysis, hits: list[RetrievalHit]) -> EvidenceDecision:
         if analysis.intent == "casual":
             return EvidenceDecision("INSUFFICIENT_EVIDENCE", (), "매뉴얼 질의 의도를 확인하지 못함")
+        if analysis.intent == "vehicle_options":
+            # The owner manual describes possible equipment and the meaning of
+            # optional-equipment marks.  It does not prove which trim or
+            # factory options are fitted to this individual vehicle.  Until a
+            # verified option inventory is introduced, a generic disclaimer
+            # must never masquerade as an answer to an option-list request.
+            return EvidenceDecision("INSUFFICIENT_EVIDENCE", (), "차량별 옵션 구성 근거 없음")
         if not hits:
             return EvidenceDecision("INSUFFICIENT_EVIDENCE", (), "검색 후보 없음")
         top = hits[0]
