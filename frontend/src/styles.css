@@ -83,3 +83,39 @@ input:focus, select:focus { border-color: #285f4a; box-shadow: 0 0 0 3px rgba(40
 .citation-link { text-decoration: underline; text-decoration-color: #9abfac; text-underline-offset: 2px; }
 .citations button, .citation-link { background: transparent; border: 0; color: #405064; display: block; font-size: .72rem; line-height: 1.45; padding: 0; text-align: left; }
 .official-manual-link { color: #146746; font-size: .9rem; font-weight: 800; margin-top: .85rem; text-decoration-color: #146746; }
+
+/* Hyundai-inspired blue palette. Layout, typography, and component hierarchy
+   stay unchanged while the former green action and status colors move to a
+   single cool-blue family. */
+:root {
+  --hyundai-navy: #002c5f;
+  --hyundai-blue: #005bac;
+  --hyundai-blue-dark: #001f45;
+  --hyundai-soft-blue: #edf6fc;
+  --hyundai-soft-blue-strong: #e3f1fb;
+  --hyundai-blue-border: #b9d8ea;
+  --hyundai-blue-text: #174f7c;
+}
+.login-intro { background: #eaf3fb; }
+.login-copy h1 { color: var(--hyundai-blue-dark); }
+.login-copy > p:last-child { color: #344b66; }
+.login-note { color: #61748d; }
+.role-option.selected { background: var(--hyundai-soft-blue); border-color: var(--hyundai-blue); box-shadow: inset 0 0 0 1px var(--hyundai-blue); }
+.role-option input, .checkbox-grid input, .primary-choice input { accent-color: var(--hyundai-blue); }
+input:focus, select:focus { border-color: var(--hyundai-blue); box-shadow: 0 0 0 3px rgba(0,91,172,.14); }
+.button.primary, .message.user p { background: var(--hyundai-blue); }
+.button.primary:hover { background: var(--hyundai-navy); }
+.admin-header nav a.active::after { background: var(--hyundai-blue); }
+.role-badge { background: var(--hyundai-soft-blue-strong); border-color: #c8dfed; color: var(--hyundai-blue); }
+.notice.success { background: #eaf4fb; color: var(--hyundai-blue); }
+.status-tag.ready { background: #e8f4fc; color: #006aa8; }
+.test-button { background: #eaf4fb; border-color: var(--hyundai-blue-border); color: var(--hyundai-blue); }
+.file-drop { border-color: #b8d3e4; }
+.file-drop.chosen { background: #f0f7fc; border-color: var(--hyundai-blue); }
+.vehicle-pills button.selected { background: var(--hyundai-soft-blue); border-color: var(--hyundai-blue); box-shadow: inset 0 0 0 1px var(--hyundai-blue); }
+.catalog-ready { background: #f0f7fc; color: var(--hyundai-blue-text) !important; }
+.manual-download b { color: var(--hyundai-blue); }
+.citations { background: #f2f8fc; border-left-color: #4d91c5; }
+.citations > strong { color: var(--hyundai-blue); }
+.citation-link { text-decoration-color: #a4cfe8; }
+.official-manual-link { color: var(--hyundai-blue); text-decoration-color: var(--hyundai-blue); }
