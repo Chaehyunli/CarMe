@@ -33,6 +33,8 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
   "database_regression: uses a locally ingested manual and is opt-in",
+  "rag_evaluation: runs an opt-in quality evaluation against the local READY corpus",
+  "rag_llm_evaluation: runs an opt-in answer-format check through the local chat model",
 ]
 
 [tool.ruff]

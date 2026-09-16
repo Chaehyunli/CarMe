@@ -48,6 +48,8 @@ _NORMALIZATIONS = {
     "자동 김서림 방지": "자동 김서림 방지 유리창 습기 방지 기능",
     "앞유리 김서림 방지": "앞유리 김서림 방지 유리창 습기 방지 기능",
 }
+_AIR_CONDITIONING_SYMPTOM_EXPANSION = "냉방 최대 냉방 송풍구 개폐 바람 안 나오"
+_WIPER_SPEED_EXPANSION = "와이퍼 스위치 속도 조절 노브 HI LO INT"
 _DIAGNOSTIC_EVIDENCE = ("성능 저하", "이상", "점검", "부족", "경고")
 _EXPLICIT_EVIDENCE_TERMS = ("반려동물", "펫", "강아지", "고양이", "엔진오일", "워셔액", "타이어")
 
@@ -217,6 +219,17 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
             intent = "manual_question"
         if topic is not None and topic.key == "bluetooth" and intent != "symptom":
             retrieval_query = _expand_bluetooth_procedure_query(retrieval_query)
+        if topic is not None and topic.key == "air_conditioning" and "찬 바람" in normalized:
+            # “찬 바람이 안 나와” is natural language, while the owner PDF
+            # describes the actionable checks as MAX A/C and vent opening.
+            # Add those exact manual labels so a dense airflow-direction table
+            # does not crowd out the directly relevant check.
+            retrieval_query = f"{retrieval_query} {_AIR_CONDITIONING_SYMPTOM_EXPANSION}"
+        if topic is not None and topic.key == "wiper" and "속도" in normalized:
+            # A cluster setting can mention the wiper mode without explaining
+            # how to change it.  Owner PDFs describe the actual control with
+            # the wiper switch, speed knob, and HI/LO/INT labels.
+            retrieval_query = f"{retrieval_query} {_WIPER_SPEED_EXPANSION}"
         if intent == "vehicle_options":
             retrieval_query = f"{retrieval_query} 선택 사양 미장착 사양표시 트림"
         return QueryAnalysis(
@@ -407,6 +420,7 @@ class CarMeRagGuardrailMiddleware(AgentMiddleware):
             heading = str(getattr(chunk, "title", "")).lower()
             heading_score = sum(4.0 for token in query_tokens if token in heading)
             heading_score += sum(8.0 for phrase in query_phrases if phrase in heading)
+            heading_score += _specific_heading_action_score(heading, analysis.normalized_question)
             if analysis.topic is not None:
                 matched = tuple(alias for alias in analysis.topic.aliases if alias in text)
                 asked_aliases = tuple(alias for alias in analysis.topic.aliases if alias in analysis.retrieval_query.lower())
@@ -510,6 +524,28 @@ def normalize_question(question: str) -> str:
     return re.sub(r"\s+", " ", normalized).strip()
 
 
+def _specific_heading_action_score(heading: str, question: str) -> float:
+    """Prefer the requested web-manual subprocedure over a sibling section.
+
+    The HTML headings have Korean verb endings such as ``연결하기`` while a
+    user naturally asks ``연결하려면``.  Token overlap alone then gives the
+    same score to sibling headings like “등록된 기기 삭제하기”.  This small
+    normalisation applies only when the noun phrase and requested action both
+    occur in the title, so it does not manufacture evidence.
+    """
+    compact_heading = re.sub(r"\s+", "", heading)
+    compact_question = re.sub(r"\s+", "", question)
+    if "등록된기기" not in compact_question:
+        return 0.0
+    if "연결" in compact_question and "등록된기기연결" in compact_heading:
+        return 42.0
+    if "삭제" in compact_question and "등록된기기삭제" in compact_heading:
+        return 42.0
+    if "해제" in compact_question and "등록된기기연결해제" in compact_heading:
+        return 42.0
+    return 0.0
+
+
 def detect_topic(text: str) -> Topic | None:
     """Prefer the most specific matching feature over a broad warning word."""
     matches = [
@@ -602,4 +638,8 @@ def _has_bluetooth_pairing_procedure(content: str) -> bool:
 
 
 def insufficient_evidence_answer() -> str:
-    return "현재 연결된 매뉴얼에서 질문과 직접 연결되는 근거를 찾지 못했습니다. 기능명, 화면 문구 또는 나타난 증상을 포함해 다시 질문해 주세요."
+    return (
+        "질문하신 내용은 현재 연결된 매뉴얼에서 확인되지 않습니다. "
+        "매뉴얼에 없는 내용을 추측해 답할 수는 없습니다. "
+        "기능명, 화면 문구 또는 나타난 증상을 포함해 다시 질문해 주세요."
+    )

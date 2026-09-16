@@ -31,6 +31,7 @@ from app.services.chat_sessions import (
     is_safety_question,
     resolve_manuals,
     resolve_official_sources,
+    safety_escalation_answer,
 )
 from app.services.rag_pipeline import (
     CarMeRagGuardrailMiddleware,
@@ -146,7 +147,7 @@ async def send_message(session_id: UUID, payload: ChatMessageCreate, current_use
     if is_safety_question(question):
         return ChatMessageResponse(
             result_status="SAFETY_ESCALATION",
-            escalation="안전과 관련된 상황일 수 있습니다. 운행을 멈추고 차량 설명서의 경고 절차 또는 현대자동차 고객센터·긴급출동 안내를 먼저 확인해 주세요.",
+            escalation=safety_escalation_answer(),
             expires_at=state.last_used_at + timedelta(minutes=get_settings().chat_session_idle_ttl_minutes),
         )
     vehicle = _owned_vehicle(db, state.vehicle_id, current_user.id)

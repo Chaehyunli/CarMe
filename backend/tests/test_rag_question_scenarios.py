@@ -77,6 +77,20 @@ def test_typo_normalization_is_used_for_retrieval(guardrail: CarMeRagGuardrailMi
     assert analysis.topic is not None and analysis.topic.key == "navigation"
 
 
+def test_air_conditioning_symptom_expands_to_owner_manual_labels(
+    guardrail: CarMeRagGuardrailMiddleware,
+) -> None:
+    analysis = guardrail.fallback_analysis("에어컨에서 찬 바람이 안 나와")
+    assert "송풍구 개폐" in analysis.retrieval_query
+
+
+def test_wiper_speed_question_expands_to_actual_control_labels(
+    guardrail: CarMeRagGuardrailMiddleware,
+) -> None:
+    analysis = guardrail.fallback_analysis("와이퍼 속도는 어떻게 바꿔?")
+    assert "속도 조절 노브" in analysis.retrieval_query
+
+
 def test_follow_up_symptom_inherits_caution_but_not_facts(guardrail: CarMeRagGuardrailMiddleware) -> None:
     analysis = guardrail.fallback_analysis("그럼 경고가 계속 뜨면?", [("user", "엔진 경고등이 켜졌어")])
     assert analysis.intent == "follow_up"

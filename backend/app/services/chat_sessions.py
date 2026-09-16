@@ -236,3 +236,11 @@ def _context_block(chunk: ManualChunk | OfficialSource) -> str:
 
 def is_safety_question(question: str) -> bool:
     return any(word in question.replace(" ", "") for word in _SAFETY)
+
+
+def safety_escalation_answer() -> str:
+    """Fixed safety route used before retrieval or answer generation."""
+    return (
+        "안전과 관련된 상황일 수 있습니다. 운행을 멈추고 차량 설명서의 경고 절차 또는 "
+        "현대자동차 고객센터, 긴급출동 안내를 먼저 확인해 주세요."
+    )
