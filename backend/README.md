@@ -108,3 +108,9 @@ python -m compileall -q app
 pytest
 ruff check .
 ```
+
+## 테스트 코드
+
+```
+CARME_RUN_RAG_EVAL=1 CARME_RUN_RAG_LLM_EVAL=1 pytest tests/rag_eval -q -s
+```
